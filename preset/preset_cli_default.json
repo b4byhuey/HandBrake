@@ -12,7 +12,7 @@
                         "copy:truehd",
                         "copy:flac"
                     ],
-                    "AudioEncoderFallback": "aac",
+                    "AudioEncoderFallback": "fdk_aac",
                     "AudioLanguageList": [
                     ],
                     "AudioList": [
@@ -20,8 +20,8 @@
                             "AudioBitrate": 128,
                             "AudioCompressionLevel": -1.0,
                             "AudioDitherMethod": "auto",
-                            "AudioEncoder": "aac",
-                            "AudioMixdown": "dpl2",
+                            "AudioEncoder": "fdk_aac",
+                            "AudioMixdown": "stereo",
                             "AudioNormalizeMixLevel": false,
                             "AudioSamplerate": "auto",
                             "AudioTrackQualityEnable": false,
@@ -39,7 +39,7 @@
                     "FileFormat": "mp4",
                     "Folder": false,
                     "FolderOpen": false,
-                    "Mp4HttpOptimize": false,
+                    "Mp4HttpOptimize": true,
                     "Mp4iPodCompatible": false,
                     "PictureAutoCrop": true,
                     "PictureCropMode": 0,
@@ -96,7 +96,7 @@
                     "SubtitleLanguageList": [
                     ],
                     "SubtitleTrackSelectionBehavior": "none",
-                    "VideoAvgBitrate": 6000,
+                    "VideoAvgBitrate": 1024,
                     "VideoColorMatrixCodeOverride": 0,
                     "VideoEncoder": "x264",
                     "VideoFramerate": "auto",
@@ -104,7 +104,7 @@
                     "VideoGrayScale": false,
                     "VideoScaler": "swscale",
                     "VideoPreset": "medium",
-                    "VideoTune": "",
+                    "VideoTune": "film",
                     "VideoProfile": "auto",
                     "VideoLevel": "auto",
                     "VideoOptionExtra": "",
@@ -112,8 +112,8 @@
                     "VideoQualitySlider": 22.0,
                     "VideoQSVDecode": false,
                     "VideoHWDecode": 0,
-                    "VideoTwoPass": false,
-                    "VideoTurboTwoPass": false,
+                    "VideoTwoPass": true,
+                    "VideoTurboTwoPass": true,
                     "x264Option": "",
                     "x264UseAdvancedOptions": false
                 }
