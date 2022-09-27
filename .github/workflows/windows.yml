@@ -5,30 +5,37 @@ on: [push, pull_request]
 jobs:
   build_mingw:
     name: CLI / LibHB
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-python@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+    - run: python -V
 
     - name: Environment Setup
       run: |
+        sudo apt-get update
+        sudo apt-get upgrade -y
         sudo apt-get purge cmake -y
-        sudo apt-get install automake autoconf build-essential intltool libtool libtool-bin make nasm patch tar yasm zlib1g-dev ninja-build gzip pax cmake
+        sudo apt-get install automake autoconf autopoint build-essential cmake gcc git intltool libtool libtool-bin m4 make nasm ninja-build patch pkg-config python tar zlib1g-dev
         sudo pip3 install meson
+        sudo apt-get autoremove -y
+        sudo apt-get autoclean
 
     - name: Setup Toolchain
       run: |
-        wget https://github.com/bradleysepos/mingw-w64-build/releases/download/9.2.0/mingw-w64-toolchain-9.2.0-linux-x86_64.tar.gz
-        SHA=$(sha1sum mingw-w64-toolchain-9.2.0-linux-x86_64.tar.gz)
-        EXPECTED="560ceb85cdf2783c68226d3761f865c42101c3f6  mingw-w64-toolchain-9.2.0-linux-x86_64.tar.gz"
+        wget https://github.com/b4byhuey/mingw-w64-build/releases/download/Linux/mingw-w64-toolchain-9.3.0-linux-x86_64.tar.gz
+        SHA=$(sha1sum mingw-w64-toolchain-9.3.0-linux-x86_64.tar.gz)
+        EXPECTED="6ef7c3d5bada794d9ee84e9872fb01f23bb819fe  mingw-w64-toolchain-9.3.0-linux-x86_64.tar.gz"
         if [ "$SHA" == "$EXPECTED" ];
         then
             echo "Toolchain Verified. Extracting ..."
             mkdir toolchains
-            mv mingw-w64-toolchain-9.2.0-linux-x86_64.tar.gz toolchains
+            mv mingw-w64-toolchain-9.3.0-linux-x86_64.tar.gz toolchains
             cd toolchains
-            tar xvf mingw-w64-toolchain-9.2.0-linux-x86_64.tar.gz
-            cd mingw-w64-toolchain-9.2.0-linux-x86_64/mingw-w64-x86_64/
+            tar xvf mingw-w64-toolchain-9.3.0-linux-x86_64.tar.gz
+            cd mingw-w64-toolchain-9.3.0-linux-x86_64/mingw-w64-x86_64/
             pwd
         else
             echo "Toolchain Verification FAILED. Exiting!"
@@ -37,9 +44,9 @@ jobs:
 
     - name: Build CLI and LibHB
       run: |
-        export PATH="/home/runner/work/HandBrake/HandBrake/toolchains/mingw-w64-toolchain-9.2.0-linux-x86_64/mingw-w64-x86_64/bin:${PATH}"
+        export PATH="/home/runner/work/HandBrake/HandBrake/toolchains/mingw-w64-toolchain-9.3.0-linux-x86_64/mingw-w64-x86_64/bin:${PATH}"
         export PATH=/usr/bin:$PATH
-        ./configure --cross=x86_64-w64-mingw32 --enable-qsv --enable-vce --enable-nvenc --enable-nvdec --launch-jobs=0 --launch
+        ./configure --cross=x86_64-w64-mingw32 --enable-qsv --enable-vce --enable-nvenc --enable-nvdec --launch-jobs=0 --launch --force
         cd build
         make pkg.create.zip
 
@@ -47,8 +54,8 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: HandBrakeCLI
-        path: ./build/HandBrakeCLI.exe
-
+        path: ./build/HandBrakeCLI.exe    
+    
     - name: Upload LibHB
       uses: actions/upload-artifact@v3
       with:
@@ -86,16 +93,86 @@ jobs:
     - name: Build Windows GUI
       run: |
         $env:Path += ";C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin"
-        msbuild win\cs\build.xml /t:x64 /p:PfxFile=$env:SigningCertificate /p:PfxPwd=${{ secrets.HandBrakeTeam_pfx_pwd }} /p:SignTimestampServer=http://time.certum.pl/
+        msbuild win\cs\build.xml /t:x64 /p:PfxFile=$env:SigningCertificate /p:PfxPwd=${{ secrets.HandBrakeTeam_pfx_pwd }} /p:SignTimestampServer=http://time.certum.pl/       
 
+    - name:  Prepare Package
+      run: |
+        echo "Creating Portable Zip"
+        cd win/CS/HandBrakeWPF/bin/publish/
+        ren portable.ini.template portable.ini
+        dir
+        cd ..
+        dir
+        rmdir /q /s Debug   
+        move publish HandBrake
+        dir             
+        7z a HandBrake-Nightly-x86_64-Win_Portable.zip * -x!HandBrake\HandBrake-Nightly-x86_64-Win_GUI.exe -x!HandBrake\*.nsi -x!HandBrake\*.config -x!*HandBrake\*.xml -x!*HandBrake\*.pdb -x!*HandBrake\*.bmp  -x!HandBrake\*.zip -x!HandBrake\*.bz2 -x!HandBrake\*.msi -x!HandBrake\*.json -mx9
+      shell: cmd
+    
     - name: Upload HandBrake exe Installer
       uses: actions/upload-artifact@v3
       with:
         name: HandBrake-x86_64-Win_GUI-EXE
-        path: win/CS/HandBrakeWPF/bin/publish/HandBrake-Nightly-x86_64-Win_GUI.exe
+        path: win/CS/HandBrakeWPF/bin/HandBrake/HandBrake-Nightly-x86_64-Win_GUI.exe
 
     - name: Upload HandBrake msi Installer
       uses: actions/upload-artifact@v3
       with:
         name:  HandBrake-x86_64-Win_GUI-MSI
-        path: win/CS/HandBrakeWPF/bin/publish/HandBrake-Nightly-x86_64-Win_GUI.msi
+        path: win/CS/HandBrakeWPF/bin/HandBrake/HandBrake-Nightly-x86_64-Win_GUI.msi
+        
+    - name: Upload HandBrake Portable
+      uses: actions/upload-artifact@v3
+      with:
+        name:  HandBrake-x86_64-Win_Portable
+        path: win/CS/HandBrakeWPF/bin/HandBrake-Nightly-x86_64-Win_Portable.zip    
+    
+  deploy_nightly:
+    name: Deploy Nightly Build
+    runs-on: ubuntu-latest
+    needs: [build_mingw, build_gui]
+    steps:
+    - uses: actions/checkout@v2
+       
+    - name: Download Artifacts - CLI
+      uses: actions/download-artifact@v2
+      with:
+        name: HandBrakeCLI
+        path: win/
+          
+    - name: Download Artifacts - GUI MSI
+      uses: actions/download-artifact@v2
+      with:
+        name: HandBrake-x86_64-Win_GUI-MSI
+        path: win/
+          
+    - name: Download Artifacts - GUI EXE
+      uses: actions/download-artifact@v2
+      with:
+        name: HandBrake-x86_64-Win_GUI-EXE
+        path: win/
+        
+    - name: Download Artifacts - Portable
+      uses: actions/download-artifact@v2
+      with:
+        name: HandBrake-x86_64-Win_Portable
+        path: win/    
+        
+    - name: Remove the old Release
+      uses: dev-drprasad/delete-older-releases@v0.2.0
+      with:
+        keep_latest: 0
+        delete_tag_pattern: "windows"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+    - uses: ncipollo/release-action@v1
+      with:
+        artifacts: "win/*.*"
+        name: "Snapshots for Windows"
+        bodyFile: .github/build.md
+        prerelease: false
+        replacesArtifacts: false
+        allowUpdates: false
+        tag: windows
+        token: ${{ secrets.GITHUB_TOKEN }}
