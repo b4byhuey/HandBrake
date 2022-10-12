@@ -171,7 +171,7 @@ jobs:
         name: "Snapshots for Windows"
         bodyFile: .github/build.md
         prerelease: false
-        replacesArtifacts: false
+        replacesArtifacts: true
         allowUpdates: false
         tag: windows
         token: ${{ secrets.GITHUB_TOKEN }}
