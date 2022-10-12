@@ -163,6 +163,7 @@ jobs:
       with:
         keep-latest-releases: false
         delete-tags: "windows"
+        max-age: PT1M
         token: ${{ secrets.GITHUB_TOKEN }}
           
     - uses: ncipollo/release-action@v1.11.1
