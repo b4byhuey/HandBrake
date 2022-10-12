@@ -159,12 +159,11 @@ jobs:
         path: win/    
         
     - name: Remove the old Release
-      uses: dev-drprasad/delete-older-releases@v0.2.0
+      uses: freenet-actions/delete-old-releases@v1
       with:
-        keep_latest: 0
-        delete_tag_pattern: "windows"
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        keep-latest-releases: false
+        delete-tags: "windows"
+        token: ${{ secrets.GITHUB_TOKEN }}
           
     - uses: ncipollo/release-action@v1.11.1
       with:
