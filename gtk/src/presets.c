@@ -2035,21 +2035,10 @@ preset_import_action_cb(GSimpleAction *action, GVariant *param,
                 GHB_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
                 NULL);
 
-    filter = gtk_file_filter_new();
-    gtk_file_filter_set_name(filter, _("All (*)"));
-    gtk_file_filter_add_pattern(filter, "*");
-    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
-
-    filter = gtk_file_filter_new();
-    gtk_file_filter_set_name(filter, _("Presets (*.json)"));
-    gtk_file_filter_add_pattern(filter, "*.json");
-    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
+    ghb_add_file_filter(GTK_FILE_CHOOSER(dialog), ud, _("All"), "FilterAll");
+    filter = ghb_add_file_filter(GTK_FILE_CHOOSER(dialog), ud, _("Presets (*.json)"), "FilterJSON");
     gtk_file_chooser_set_filter(GTK_FILE_CHOOSER(dialog), filter);
-
-    filter = gtk_file_filter_new();
-    gtk_file_filter_set_name(filter, _("Legacy Presets (*.plist)"));
-    gtk_file_filter_add_pattern(filter, "*.plist");
-    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
+    ghb_add_file_filter(GTK_FILE_CHOOSER(dialog), ud, _("Legacy Presets (*.plist)"), "FilterPlist");
 
     exportDir = ghb_dict_get_string(ud->prefs, "ExportDirectory");
     if (exportDir == NULL || exportDir[0] == '\0')
@@ -2457,22 +2446,24 @@ preset_remove_action_cb(GSimpleAction *action, GVariant *param,
     }
 
     GtkWindow       * hb_window;
-    GtkWidget       * dialog;
     gboolean          is_folder;
     GtkResponseType   response;
     const char      * name;
+    char            * message;
 
     name  = ghb_dict_get_string(preset, "PresetName");
     is_folder = preset_is_folder(path);
     hb_window = GTK_WINDOW(GHB_WIDGET(ud->builder, "hb_window"));
-    dialog = gtk_message_dialog_new(hb_window, GTK_DIALOG_MODAL,
-                        GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO,
-                        _("Confirm deletion of %s:\n\n%s"),
-                        is_folder ? _("folder") : _("preset"),
-                        name);
-    response = gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy(dialog);
-    if (response == GTK_RESPONSE_YES)
+    message = g_strdup_printf(_("Confirm deletion of %s:\n\n%s"),
+                              is_folder ? _("folder") : _("preset"),
+                              name);
+    response = ghb_message_dialog(hb_window,
+                        GTK_MESSAGE_WARNING,
+                        message,
+                        _("Cancel"),
+                        _("Delete"));
+    g_free(message);
+    if (response)
     {
         int depth = path->depth;
 

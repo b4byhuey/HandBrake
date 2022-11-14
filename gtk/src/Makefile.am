@@ -4,37 +4,38 @@ icons =	\
 	hb-icon.svg fr.handbrake.ghb.svg
 
 icons_dep =	\
-	icons/24x24/apps/hb-remove.png \
-	icons/32x32/apps/hb-source.png \
-	icons/32x32/apps/hb-picture.png \
-	icons/32x32/apps/hb-add-queue.png \
-	icons/32x32/apps/hb-showqueue.png \
-	icons/32x32/apps/hb-activity.png \
+	icons/24x24/apps/hb-advanced-symbolic.symbolic.png \
+	icons/32x32/apps/hb-source-symbolic.symbolic.png \
+	icons/32x32/apps/hb-picture-symbolic.symbolic.png \
+	icons/32x32/apps/hb-add-queue-symbolic.symbolic.png \
+	icons/32x32/apps/hb-showqueue-symbolic.symbolic.png \
+	icons/32x32/apps/hb-activity-symbolic.symbolic.png \
+	icons/32x32/apps/hb-presets-symbolic.symbolic.png \
 	icons/32x32/apps/hb-start.png \
 	icons/32x32/apps/hb-stop.png \
 	icons/32x32/apps/hb-pause.png \
-	icons/48x48/apps/hb-remove.png \
-	icons/64x64/apps/hb-source.png \
-	icons/64x64/apps/hb-picture.png \
-	icons/64x64/apps/hb-add-queue.png \
-	icons/64x64/apps/hb-showqueue.png \
-	icons/64x64/apps/hb-activity.png \
+	icons/48x48/apps/hb-advanced-symbolic.symbolic.png \
+	icons/64x64/apps/hb-source-symbolic.symbolic.png \
+	icons/64x64/apps/hb-picture-symbolic.symbolic.png \
+	icons/64x64/apps/hb-add-queue-symbolic.symbolic.png \
+	icons/64x64/apps/hb-showqueue-symbolic.symbolic.png \
+	icons/64x64/apps/hb-activity-symbolic.symbolic.png \
+	icons/64x64/apps/hb-presets-symbolic.symbolic.png \
 	icons/64x64/apps/hb-start.png \
 	icons/64x64/apps/hb-stop.png \
 	icons/64x64/apps/hb-pause.png \
-	icons/scalable/apps/hb-source.svg \
-	icons/scalable/apps/hb-picture.svg \
-	icons/scalable/apps/hb-add-queue.svg \
-	icons/scalable/apps/hb-showqueue.svg \
-	icons/scalable/apps/hb-activity.svg \
+	icons/scalable/apps/hb-advanced-symbolic.svg \
+	icons/scalable/apps/hb-source-symbolic.svg \
+	icons/scalable/apps/hb-picture-symbolic.svg \
+	icons/scalable/apps/hb-add-queue-symbolic.svg \
+	icons/scalable/apps/hb-showqueue-symbolic.svg \
+	icons/scalable/apps/hb-activity-symbolic.svg \
+	icons/scalable/apps/hb-presets-symbolic.svg \
 	icons/scalable/apps/hb-start.svg \
 	icons/scalable/apps/hb-stop.svg \
 	icons/scalable/apps/hb-pause.svg \
-	icons/scalable/apps/hb-remove.svg \
 	icons/scalable/apps/hb-complete.svg \
-	icons/scalable/apps/hb-edit.svg \
 	icons/scalable/apps/hb-icon.svg \
-	icons/scalable/apps/hb-advanced.svg \
 	icons/scalable/apps/fr.handbrake.ghb.svg
 
 hb_menu = fr.handbrake.ghb.desktop
@@ -113,7 +114,9 @@ ghb_SOURCES = \
 	ghb-dvd.c \
 	ghb-dvd.h \
 	marshalers.c \
-	marshalers.h
+	marshalers.h \
+	color-scheme.c \
+	color-scheme.h
 
 if MINGW
 ghb_LDFLAGS = \
@@ -158,10 +161,11 @@ UI_FILE=ghb3.ui
 endif
 endif
 
-ui_res.c : ui_res.gresource.xml ui_res.h $(srcdir)/$(UI_FILE)
+ui_res.c : ui_res.gresource.xml ui_res.h $(srcdir)/$(UI_FILE) $(srcdir)/menu.ui
 	glib-compile-resources --generate --target=$@ --c-name ghb_ui --manual-register $<
 
-ui_res.h : ui_res.gresource.xml $(srcdir)/$(UI_FILE)
+ui_res.h : ui_res.gresource.xml $(srcdir)/$(UI_FILE) $(srcdir)/menu.ui
+	cp $(srcdir)/menu.ui menu.ui
 	cp $(srcdir)/$(UI_FILE) ghb.ui
 	glib-compile-resources --generate --target=$@ --c-name ghb_ui --manual-register $<
 

@@ -40,7 +40,6 @@
 #define GHB_THREAD_NEW(n, f, p) \
                 g_thread_create((GThreadFunc)(f), (p), TRUE, NULL)
 #endif
-
 void ghb_check_all_dependencies(signal_user_data_t *ud);
 gboolean ghb_timer_cb(gpointer data);
 gboolean ghb_log_cb(GIOChannel *source, GIOCondition cond, gpointer data);
@@ -51,6 +50,9 @@ void debug_log_handler(
 void ghb_hbfd(signal_user_data_t *ud, gboolean hbfd);
 gboolean ghb_file_menu_add_dvd(signal_user_data_t *ud);
 void ghb_udev_init(void);
+gboolean ghb_title_message_dialog(
+    GtkWindow *parent, GtkMessageType type, const gchar *title,
+    const gchar *message, const gchar *no, const gchar *yes);
 gboolean ghb_message_dialog(
     GtkWindow *parent, GtkMessageType type, const gchar *message,
     const gchar *no, const gchar *yes);
@@ -91,6 +93,9 @@ void ghb_browse_uri(signal_user_data_t *ud, const gchar *uri);
 void ghb_break_pts_duration(gint64 ptsDuration,
                             gint *hh, gint *mm, gdouble *ss);
 void ghb_break_duration(gint64 duration, gint *hh, gint *mm, gint *ss);
+GtkFileFilter *ghb_add_file_filter(GtkFileChooser *chooser,
+                                   signal_user_data_t *ud,
+                                   const char *name, const char *id);
 
 #endif // _CALLBACKS_H_
 

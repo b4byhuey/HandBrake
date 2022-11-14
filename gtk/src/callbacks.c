@@ -97,30 +97,29 @@ static GList* dvd_device_list();
 static void prune_logs(signal_user_data_t *ud);
 void ghb_notify_done(signal_user_data_t *ud);
 gpointer ghb_check_update(signal_user_data_t *ud);
-static gboolean ghb_can_shutdown_gsm();
-static void ghb_shutdown_gsm();
-static gboolean ghb_can_suspend_gpm();
-static void ghb_suspend_gpm();
+static gboolean ghb_can_suspend_logind();
+static void ghb_suspend_logind();
 static gboolean appcast_busy = FALSE;
 
 #if !defined(_WIN32)
+#define DBUS_LOGIND_SERVICE         "org.freedesktop.login1"
+#define DBUS_LOGIND_PATH            "/org/freedesktop/login1"
+#define DBUS_LOGIND_INTERFACE       "org.freedesktop.login1.Manager"
 #define GPM_DBUS_PM_SERVICE         "org.freedesktop.PowerManagement"
-#define GPM_DBUS_PM_PATH            "/org/freedesktop/PowerManagement"
-#define GPM_DBUS_PM_INTERFACE       "org.freedesktop.PowerManagement"
 #define GPM_DBUS_INHIBIT_PATH       "/org/freedesktop/PowerManagement/Inhibit"
 #define GPM_DBUS_INHIBIT_INTERFACE  "org.freedesktop.PowerManagement.Inhibit"
 #endif
 
 #if !defined(_WIN32)
 static GDBusProxy *
-ghb_get_session_dbus_proxy(const gchar *name, const gchar *path, const gchar *interface)
+ghb_get_dbus_proxy(GBusType type, const gchar *name, const gchar *path, const gchar *interface)
 {
     GDBusConnection *conn;
     GDBusProxy *proxy;
     GError *error = NULL;
 
-    g_debug("ghb_get_session_dbus_proxy()");
-    conn = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &error);
+    g_debug("ghb_get_dbus_proxy()");
+    conn = g_bus_get_sync(type, NULL, &error);
     if (conn == NULL)
     {
         if (error != NULL)
@@ -142,18 +141,19 @@ ghb_get_session_dbus_proxy(const gchar *name, const gchar *path, const gchar *in
 #endif
 
 static gboolean
-ghb_can_suspend_gpm()
+ghb_can_suspend_logind()
 {
     gboolean can_suspend = FALSE;
 #if !defined(_WIN32)
+    char *str = NULL;
     GDBusProxy  *proxy;
     GError *error = NULL;
     GVariant *res;
 
 
-    g_debug("ghb_can_suspend_gpm()");
-    proxy = ghb_get_session_dbus_proxy(GPM_DBUS_PM_SERVICE,
-                            GPM_DBUS_PM_PATH, GPM_DBUS_PM_INTERFACE);
+    g_debug("ghb_can_suspend_logind()");
+    proxy = ghb_get_dbus_proxy(G_BUS_TYPE_SYSTEM, DBUS_LOGIND_SERVICE,
+                            DBUS_LOGIND_PATH, DBUS_LOGIND_INTERFACE);
     if (proxy == NULL)
         return FALSE;
 
@@ -173,8 +173,12 @@ ghb_can_suspend_gpm()
     }
     else
     {
-        g_variant_get(res, "(b)", &can_suspend);
+        g_variant_get(res, "(s)", &str);
         g_variant_unref(res);
+        if (g_strcmp0(str, "yes") == 0)
+            can_suspend = TRUE;
+
+        g_free(str);
     }
     g_object_unref(G_OBJECT(proxy));
 #endif
@@ -182,7 +186,7 @@ ghb_can_suspend_gpm()
 }
 
 static void
-ghb_suspend_gpm()
+ghb_suspend_logind()
 {
 #if !defined(_WIN32)
     GDBusProxy  *proxy;
@@ -190,13 +194,13 @@ ghb_suspend_gpm()
     GVariant *res;
 
 
-    g_debug("ghb_suspend_gpm()");
-    proxy = ghb_get_session_dbus_proxy(GPM_DBUS_PM_SERVICE,
-                            GPM_DBUS_PM_PATH, GPM_DBUS_PM_INTERFACE);
+    g_debug("ghb_suspend_logind()");
+    proxy = ghb_get_dbus_proxy(G_BUS_TYPE_SYSTEM, DBUS_LOGIND_SERVICE,
+                            DBUS_LOGIND_PATH, DBUS_LOGIND_INTERFACE);
     if (proxy == NULL)
         return;
 
-    res = g_dbus_proxy_call_sync(proxy, "Suspend", NULL,
+    res = g_dbus_proxy_call_sync(proxy, "Suspend", g_variant_new("(b)", FALSE),
                                  G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
     if (!res)
     {
@@ -218,38 +222,43 @@ ghb_suspend_gpm()
 
 #if !defined(_WIN32)
 static gboolean
-ghb_can_shutdown_gpm()
+ghb_can_shutdown_logind()
 {
+    char *str = NULL;
     gboolean can_shutdown = FALSE;
     GDBusProxy  *proxy;
     GError *error = NULL;
     GVariant *res;
 
 
-    g_debug("ghb_can_shutdown_gpm()");
-    proxy = ghb_get_session_dbus_proxy(GPM_DBUS_PM_SERVICE,
-                            GPM_DBUS_PM_PATH, GPM_DBUS_PM_INTERFACE);
+    g_debug("ghb_can_shutdown_logind()");
+    proxy = ghb_get_dbus_proxy(G_BUS_TYPE_SYSTEM, DBUS_LOGIND_SERVICE,
+                            DBUS_LOGIND_PATH, DBUS_LOGIND_INTERFACE);
     if (proxy == NULL)
         return FALSE;
 
-    res = g_dbus_proxy_call_sync(proxy, "CanShutdown", NULL,
+    res = g_dbus_proxy_call_sync(proxy, "CanPowerOff", NULL,
                                  G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
     if (!res)
     {
         if (error != NULL)
         {
-            g_warning("CanShutdown failed: %s", error->message);
+            g_warning("CanPowerOff failed: %s", error->message);
             g_error_free(error);
         }
         else
-            g_warning("CanShutdown failed");
+            g_warning("CanPowerOff failed");
         // Try to shutdown anyway
         can_shutdown = TRUE;
     }
     else
     {
-        g_variant_get(res, "(b)", &can_shutdown);
+        g_variant_get(res, "(s)", &str);
         g_variant_unref(res);
+        if (g_strcmp0(str, "yes") == 0)
+            can_shutdown = TRUE;
+
+        g_free(str);
     }
     g_object_unref(G_OBJECT(proxy));
     return can_shutdown;
@@ -258,30 +267,30 @@ ghb_can_shutdown_gpm()
 
 #if !defined(_WIN32)
 static void
-ghb_shutdown_gpm()
+ghb_shutdown_logind(void)
 {
     GDBusProxy  *proxy;
     GError *error = NULL;
     GVariant *res;
 
 
-    g_debug("ghb_shutdown_gpm()");
-    proxy = ghb_get_session_dbus_proxy(GPM_DBUS_PM_SERVICE,
-                            GPM_DBUS_PM_PATH, GPM_DBUS_PM_INTERFACE);
+    g_debug("ghb_shutdown_logind()");
+    proxy = ghb_get_dbus_proxy(G_BUS_TYPE_SYSTEM, DBUS_LOGIND_SERVICE,
+                            DBUS_LOGIND_PATH, DBUS_LOGIND_INTERFACE);
     if (proxy == NULL)
         return;
 
-    res = g_dbus_proxy_call_sync(proxy, "Shutdown", NULL,
+    res = g_dbus_proxy_call_sync(proxy, "PowerOff", g_variant_new("(b)", FALSE),
                                  G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
     if (!res)
     {
         if (error != NULL)
         {
-            g_warning("Shutdown failed: %s", error->message);
+            g_warning("PowerOff failed: %s", error->message);
             g_error_free(error);
         }
         else
-            g_warning("Shutdown failed");
+            g_warning("PowerOff failed");
     }
     else
     {
@@ -303,7 +312,7 @@ ghb_inhibit_gpm()
     GVariant *res;
 
     g_debug("ghb_inhibit_gpm()");
-    proxy = ghb_get_session_dbus_proxy(GPM_DBUS_PM_SERVICE,
+    proxy = ghb_get_dbus_proxy(G_BUS_TYPE_SESSION, GPM_DBUS_PM_SERVICE,
                             GPM_DBUS_INHIBIT_PATH, GPM_DBUS_INHIBIT_INTERFACE);
     if (proxy == NULL)
         return 0;
@@ -339,7 +348,7 @@ ghb_uninhibit_gpm(guint cookie)
 
     g_debug("ghb_uninhibit_gpm() cookie %u", cookie);
 
-    proxy = ghb_get_session_dbus_proxy(GPM_DBUS_PM_SERVICE,
+    proxy = ghb_get_dbus_proxy(G_BUS_TYPE_SESSION, GPM_DBUS_PM_SERVICE,
                             GPM_DBUS_INHIBIT_PATH, GPM_DBUS_INHIBIT_INTERFACE);
     if (proxy == NULL)
         return;
@@ -370,75 +379,6 @@ ghb_uninhibit_gpm(guint cookie)
 #define GPM_DBUS_SM_INTERFACE       "org.gnome.SessionManager"
 #endif
 
-static gboolean
-ghb_can_shutdown_gsm()
-{
-    gboolean can_shutdown = FALSE;
-#if !defined(_WIN32)
-    GDBusProxy  *proxy;
-    GError *error = NULL;
-    GVariant *res;
-
-    proxy = ghb_get_session_dbus_proxy(GPM_DBUS_SM_SERVICE,
-                            GPM_DBUS_SM_PATH, GPM_DBUS_SM_INTERFACE);
-    if (proxy == NULL)
-        return FALSE;
-
-    res = g_dbus_proxy_call_sync(proxy, "CanShutdown", NULL,
-                                 G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
-    g_object_unref(G_OBJECT(proxy));
-    if (!res)
-    {
-        if (error != NULL)
-        {
-            g_error_free(error);
-        }
-        // Try the gpm version
-        can_shutdown = ghb_can_shutdown_gpm();
-    }
-    else
-    {
-        g_variant_get(res, "(b)", &can_shutdown);
-        g_variant_unref(res);
-    }
-#endif
-    return can_shutdown;
-}
-
-static void
-ghb_shutdown_gsm()
-{
-#if !defined(_WIN32)
-    GDBusProxy  *proxy;
-    GError *error = NULL;
-    GVariant *res;
-
-
-    g_debug("ghb_shutdown_gpm()");
-    proxy = ghb_get_session_dbus_proxy(GPM_DBUS_SM_SERVICE,
-                            GPM_DBUS_SM_PATH, GPM_DBUS_SM_INTERFACE);
-    if (proxy == NULL)
-        return;
-
-    res = g_dbus_proxy_call_sync(proxy, "Shutdown", NULL,
-                                 G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
-    g_object_unref(G_OBJECT(proxy));
-    if (!res)
-    {
-        if (error != NULL)
-        {
-            g_error_free(error);
-        }
-        // Try the gpm version
-        ghb_shutdown_gpm();
-    }
-    else
-    {
-        g_variant_unref(res);
-    }
-#endif
-}
-
 #if !GTK_CHECK_VERSION(3, 4, 0)
 guint
 ghb_inhibit_gsm(signal_user_data_t *ud)
@@ -453,7 +393,7 @@ ghb_inhibit_gsm(signal_user_data_t *ud)
     GtkWidget *widget;
 
     g_debug("ghb_inhibit_gsm()");
-    proxy = ghb_get_session_dbus_proxy(GPM_DBUS_SM_SERVICE,
+    proxy = ghb_get_dbus_proxy(G_BUS_TYPE_SESSION, GPM_DBUS_SM_SERVICE,
                             GPM_DBUS_SM_PATH, GPM_DBUS_SM_INTERFACE);
     if (proxy == NULL)
         return -1;
@@ -491,7 +431,7 @@ ghb_uninhibit_gsm(guint cookie)
 
     g_debug("ghb_uninhibit_gsm() cookie %u", cookie);
 
-    proxy = ghb_get_session_dbus_proxy(GPM_DBUS_SM_SERVICE,
+    proxy = ghb_get_dbus_proxy(G_BUS_TYPE_SESSION, GPM_DBUS_SM_SERVICE,
                             GPM_DBUS_SM_PATH, GPM_DBUS_SM_INTERFACE);
     if (proxy == NULL)
         return;
@@ -936,11 +876,7 @@ get_dvd_volume_name(gpointer gd)
         {
             camel_convert(label);
         }
-#if defined(_WIN32)
         result = g_strdup_printf("%s (%s)", label, drive);
-#else
-        result = g_strdup_printf("%s - %s", drive, label);
-#endif
         g_free(label);
     }
     else
@@ -1368,6 +1304,8 @@ source_dialog_extra_widgets(
 {
     GtkComboBoxText *combo;
     GList *drives, *link;
+    GtkWidget *source_extra, *ok_button;
+    GtkStyleContext *ok_style;
 
     g_debug("source_dialog_extra_widgets ()");
     combo = GTK_COMBO_BOX_TEXT(GHB_WIDGET(ud->builder, "source_device"));
@@ -1386,6 +1324,12 @@ source_dialog_extra_widgets(
     }
     g_list_free(drives);
     gtk_combo_box_set_active(GTK_COMBO_BOX(combo), 0);
+
+    ok_button = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
+    ok_style = gtk_widget_get_style_context(ok_button);
+    gtk_style_context_add_class(ok_style, "suggested-action");
+    source_extra = GHB_WIDGET(ud->builder, "source_extra");
+    gtk_file_chooser_set_extra_widget(GTK_FILE_CHOOSER(dialog), source_extra);
 }
 
 void ghb_break_pts_duration(gint64 ptsDuration, gint *hh, gint *mm, gdouble *ss)
@@ -1746,11 +1690,6 @@ start_scan(
     gtk_tool_button_set_icon_name(GTK_TOOL_BUTTON(widget), "hb-stop");
     gtk_tool_button_set_label(GTK_TOOL_BUTTON(widget), _("Stop Scan"));
     gtk_tool_item_set_tooltip_text(GTK_TOOL_ITEM(widget), _("Stop Scan"));
-
-    widget = GHB_WIDGET(ud->builder, "source_open");
-    gtk_widget_set_sensitive(widget, FALSE);
-    widget = GHB_WIDGET(ud->builder, "source_title_open");
-    gtk_widget_set_sensitive(widget, FALSE);
     ghb_backend_scan(path, title_id, preview_count,
             90000L * ghb_dict_get_int(ud->prefs, "MinTitleDuration"));
 }
@@ -1828,7 +1767,7 @@ do_source_dialog(gboolean single, signal_user_data_t *ud)
 {
     GtkWidget *dialog;
     const gchar *sourcename;
-    gint    response;
+    gint response;
 
     g_debug("source_browse_clicked_cb ()");
     sourcename = ghb_dict_get_string(ud->globals, "scan_source");
@@ -1838,6 +1777,7 @@ do_source_dialog(gboolean single, signal_user_data_t *ud)
         gtk_widget_show(widget);
     else
         gtk_widget_hide(widget);
+
     dialog = GHB_WIDGET(ud->builder, "source_dialog");
     source_dialog_extra_widgets(ud, dialog);
 
@@ -1846,7 +1786,7 @@ do_source_dialog(gboolean single, signal_user_data_t *ud)
 
     response = gtk_dialog_run(GTK_DIALOG (dialog));
     gtk_widget_hide(dialog);
-    if (response == GTK_RESPONSE_NO)
+    if (response == GTK_RESPONSE_OK)
     {
         gchar *filename;
 
@@ -1915,7 +1855,8 @@ single_title_action_cb(GSimpleAction *action, GVariant * param,
 }
 
 G_MODULE_EXPORT void
-dvd_source_activate_cb(GtkWidget *widget, signal_user_data_t *ud)
+dvd_source_activate_cb(GSimpleAction *action, GVariant *param,
+                       signal_user_data_t *ud)
 {
     const gchar *filename;
     const gchar *sourcename;
@@ -1924,7 +1865,7 @@ dvd_source_activate_cb(GtkWidget *widget, signal_user_data_t *ud)
     // be finished with sourcename before calling ghb_do_scan
     // since the memory it references will be freed
     sourcename = ghb_dict_get_string(ud->globals, "scan_source");
-    filename = gtk_buildable_get_name(GTK_BUILDABLE(widget));
+    filename = g_variant_get_string(param, NULL);
     if (strcmp(sourcename, filename) != 0)
     {
         ghb_dict_set_string(ud->prefs, "default_source", filename);
@@ -2823,15 +2764,15 @@ title_changed_cb(GtkWidget *widget, signal_user_data_t *ud)
 {
     gint               title_id, titleindex, count;
     const hb_title_t * title;
-    GtkLabel         * title_label;
+    GtkEntry         * title_label;
     char             * label;
 
     title_id = ghb_widget_int(widget);
     title = ghb_lookup_title(title_id, &titleindex);
 
     label = ghb_create_title_label(title);
-    title_label = GTK_LABEL(GHB_WIDGET(ud->builder, "title_label"));
-    gtk_label_set_markup(title_label, label);
+    title_label = GTK_ENTRY(GHB_WIDGET(ud->builder, "title_label"));
+    gtk_entry_set_text(title_label, label);
     g_free(label);
 
     count = ghb_array_len(ud->settings_array);
@@ -3690,20 +3631,12 @@ preferences_action_cb(GSimpleAction *action, GVariant *param,
 
     if (prefs_require_restart)
     {
-        GtkWidget * dialog;
-        GtkWindow * hb_window;
-
-        hb_window = GTK_WINDOW(GHB_WIDGET(ud->builder, "hb_window"));
+        GtkWindow *hb_window = GTK_WINDOW(GHB_WIDGET(ud->builder, "hb_window"));
 
         // Toss up a warning dialog
-        dialog = gtk_message_dialog_new(hb_window,   GTK_DIALOG_MODAL,
-                                GTK_MESSAGE_WARNING, GTK_BUTTONS_NONE,
-                                "You must restart HandBrake now");
-        gtk_dialog_add_buttons( GTK_DIALOG(dialog),
-                               "Exit HandBrake", GTK_RESPONSE_YES, NULL);
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy (dialog);
-
+        ghb_message_dialog(hb_window, GTK_MESSAGE_WARNING,
+                           "You must restart HandBrake now",
+                           "Exit HandBrake", NULL);
         ghb_hb_cleanup(FALSE);
         prune_logs(ud);
         g_application_quit(G_APPLICATION(ud->app));
@@ -3747,18 +3680,18 @@ shutdown_cb(countdown_t *cd)
     gchar *str;
 
     cd->timeout--;
+    str = g_strdup_printf(_("%s\n\n%s in %d seconds ..."),
+                            cd->msg, cd->action, cd->timeout);
+    gtk_message_dialog_set_markup(cd->dlg, str);
     if (cd->timeout == 0)
     {
         ghb_hb_cleanup(FALSE);
         prune_logs(cd->ud);
 
-        ghb_shutdown_gsm();
+        ghb_shutdown_logind();
         g_application_quit(G_APPLICATION(cd->ud->app));
         return FALSE;
     }
-    str = g_strdup_printf(_("%s\n\n%s in %d seconds ..."),
-                            cd->msg, cd->action, cd->timeout);
-    gtk_message_dialog_set_markup(cd->dlg, str);
     g_free(str);
     return TRUE;
 }
@@ -3769,15 +3702,15 @@ suspend_cb(countdown_t *cd)
     gchar *str;
 
     cd->timeout--;
-    if (cd->timeout == 0)
-    {
-        gtk_widget_destroy (GTK_WIDGET(cd->dlg));
-        ghb_suspend_gpm();
-        return FALSE;
-    }
     str = g_strdup_printf(_("%s\n\n%s in %d seconds ..."),
                             cd->msg, cd->action, cd->timeout);
     gtk_message_dialog_set_markup(cd->dlg, str);
+    if (cd->timeout == 0)
+    {
+        gtk_widget_destroy (GTK_WIDGET(cd->dlg));
+        ghb_suspend_logind();
+        return FALSE;
+    }
     g_free(str);
     return TRUE;
 }
@@ -3816,7 +3749,6 @@ ghb_countdown_dialog(
     cd.dlg = GTK_MESSAGE_DIALOG(dialog);
     timeout_id = g_timeout_add(1000, action_func, &cd);
     response = gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy (dialog);
     if (response == GTK_RESPONSE_CANCEL)
     {
         GMainContext *mc;
@@ -3826,22 +3758,46 @@ ghb_countdown_dialog(
         source = g_main_context_find_source_by_id(mc, timeout_id);
         if (source != NULL)
             g_source_destroy(source);
+        gtk_widget_destroy (dialog);
     }
 }
 
 gboolean
-ghb_message_dialog(GtkWindow *parent, GtkMessageType type, const gchar *message, const gchar *no, const gchar *yes)
+ghb_title_message_dialog(GtkWindow *parent, GtkMessageType type, const gchar *title,
+                         const gchar *message, const gchar *no, const gchar *yes)
 {
-    GtkWidget *dialog;
+    GtkWidget *dialog, *yes_button;
     GtkResponseType response;
+    GtkStyleContext *yes_style;
 
     // Toss up a warning dialog
     dialog = gtk_message_dialog_new(parent, GTK_DIALOG_MODAL,
                             type, GTK_BUTTONS_NONE,
-                            "%s", message);
-    gtk_dialog_add_buttons( GTK_DIALOG(dialog),
+                            "%s", title);
+    if (message)
+        gtk_message_dialog_format_secondary_text(GTK_MESSAGE_DIALOG(dialog), message);
+
+    gtk_dialog_add_buttons(GTK_DIALOG(dialog),
                            no, GTK_RESPONSE_NO,
                            yes, GTK_RESPONSE_YES, NULL);
+
+    yes_button = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog), GTK_RESPONSE_YES);
+    yes_style = gtk_widget_get_style_context(yes_button);
+
+    // Use GTK_MESSAGE_QUESTION for a neutral dialog,
+    // GTK_MESSAGE_INFO for a blue 'suggested-action' confirm button, or
+    // GTK_MESSAGE_WARNING for a red 'destructive-action' confirm button.
+    switch (type)
+    {
+    case GTK_MESSAGE_INFO:
+        gtk_style_context_add_class(yes_style, "suggested-action");
+        break;
+    case GTK_MESSAGE_WARNING:
+    case GTK_MESSAGE_ERROR:
+        gtk_style_context_add_class(yes_style, "destructive-action");
+    default:
+        break;
+    }
     response = gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy (dialog);
     if (response == GTK_RESPONSE_NO)
@@ -3851,27 +3807,27 @@ ghb_message_dialog(GtkWindow *parent, GtkMessageType type, const gchar *message,
     return TRUE;
 }
 
+gboolean
+ghb_message_dialog(GtkWindow *parent, GtkMessageType type, const gchar *message,
+                   const gchar *no, const gchar *yes)
+{
+    return ghb_title_message_dialog(parent, type, message, NULL, no, yes);
+}
+
+
 void
 ghb_error_dialog(GtkWindow *parent, GtkMessageType type, const gchar *message, const gchar *cancel)
 {
-    GtkWidget *dialog;
-
-    // Toss up a warning dialog
-    dialog = gtk_message_dialog_new(parent, GTK_DIALOG_MODAL,
-                            type, GTK_BUTTONS_NONE,
-                            "%s", message);
-    gtk_dialog_add_buttons( GTK_DIALOG(dialog),
-                           cancel, GTK_RESPONSE_CANCEL, NULL);
-    gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy (dialog);
+    ghb_message_dialog(parent, type, message, cancel, NULL);
 }
 
 void
 ghb_cancel_encode(signal_user_data_t *ud, const gchar *extra_msg)
 {
     GtkWindow *hb_window;
-    GtkWidget *dialog;
+    GtkWidget *dialog, *cancel;
     GtkResponseType response;
+    GtkStyleContext *style;
 
     if (extra_msg == NULL) extra_msg = "";
     // Toss up a warning dialog
@@ -3886,6 +3842,14 @@ ghb_cancel_encode(signal_user_data_t *ud, const gchar *extra_msg)
                            _("Finish Current, then Stop"), 3,
                            _("Continue Encoding"), 4,
                            NULL);
+
+    cancel = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog), 1);
+    style = gtk_widget_get_style_context(cancel);
+    gtk_style_context_add_class(style, "destructive-action");
+    cancel = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog), 2);
+    style = gtk_widget_get_style_context(cancel);
+    gtk_style_context_add_class(style, "destructive-action");
+
     response = gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy (dialog);
     switch ((int)response)
@@ -3912,8 +3876,9 @@ gboolean
 ghb_cancel_encode2(signal_user_data_t *ud, const gchar *extra_msg)
 {
     GtkWindow *hb_window;
-    GtkWidget *dialog;
+    GtkWidget *dialog, *cancel;
     GtkResponseType response;
+    GtkStyleContext *style;
 
     if (extra_msg == NULL) extra_msg = "";
     // Toss up a warning dialog
@@ -3926,6 +3891,11 @@ ghb_cancel_encode2(signal_user_data_t *ud, const gchar *extra_msg)
                            _("Cancel Current and Stop"), 1,
                            _("Continue Encoding"), 4,
                            NULL);
+
+    cancel = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog), 1);
+    style = gtk_widget_get_style_context(cancel);
+    gtk_style_context_add_class(style, "destructive-action");
+
     response = gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy (dialog);
     switch ((int)response)
@@ -4097,14 +4067,14 @@ ghb_update_pending(signal_user_data_t *ud)
 {
     GtkLabel *label;
     gint pending;
-    gchar *str;
+    gchar *str = NULL;
 
     pending = queue_pending_count(ud->queue);
     if (pending == 1)
     {
         str = g_strdup_printf(_("%d encode pending"), pending);
     }
-    else
+    else if (pending > 1)
     {
         str = g_strdup_printf(_("%d encodes pending"), pending);
     }
@@ -4336,11 +4306,6 @@ ghb_backend_events(signal_user_data_t *ud)
         gtk_tool_button_set_icon_name(GTK_TOOL_BUTTON(widget), "hb-source");
         gtk_tool_button_set_label(GTK_TOOL_BUTTON(widget), _("Open Source"));
         gtk_tool_item_set_tooltip_text(GTK_TOOL_ITEM(widget), _("Choose Video Source"));
-
-        widget = GHB_WIDGET(ud->builder, "source_open");
-        gtk_widget_set_sensitive(widget, TRUE);
-        widget = GHB_WIDGET(ud->builder, "source_title_open");
-        gtk_widget_set_sensitive(widget, TRUE);
 
         hide_scan_progress(ud);
 
@@ -4875,15 +4840,9 @@ ghb_hbfd(signal_user_data_t *ud, gboolean hbfd)
     widget = GHB_WIDGET(ud->builder, "show_activity");
     gtk_widget_set_visible(widget, !hbfd);
 
-    widget = GHB_WIDGET(ud->builder, "container_box");
-    gtk_widget_set_visible(widget, !hbfd);
     widget = GHB_WIDGET(ud->builder, "SettingsStackSwitcher");
     gtk_widget_set_visible(widget, !hbfd);
     widget = GHB_WIDGET(ud->builder, "SettingsStack");
-    gtk_widget_set_visible(widget, !hbfd);
-    widget = GHB_WIDGET(ud->builder, "presets_save");
-    gtk_widget_set_visible(widget, !hbfd);
-    widget = GHB_WIDGET(ud->builder, "presets_remove");
     gtk_widget_set_visible(widget, !hbfd);
     widget = GHB_WIDGET (ud->builder, "hb_window");
     gtk_window_resize(GTK_WINDOW(widget), 16, 16);
@@ -4953,10 +4912,14 @@ activity_font_changed_cb(GtkWidget *widget, signal_user_data_t *ud)
 #endif
 }
 
+// Changes the setting for the current session
+// and also saves it for future sessions
 G_MODULE_EXPORT void
 when_complete_changed_cb(GtkWidget *widget, signal_user_data_t *ud)
 {
     GhbValue * value = ghb_widget_value(widget);
+    ud->when_complete = gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
+    ghb_ui_update(ud, "MainWhenComplete", value);
     ghb_ui_update(ud, "QueueWhenComplete", value);
     ghb_value_free(&value);
 
@@ -4968,11 +4931,14 @@ when_complete_changed_cb(GtkWidget *widget, signal_user_data_t *ud)
     ghb_prefs_store();
 }
 
+// Only changes the setting for the current session
 G_MODULE_EXPORT void
-queue_when_complete_changed_cb(GtkWidget *widget, signal_user_data_t *ud)
+temp_when_complete_changed_cb(GtkWidget *widget, signal_user_data_t *ud)
 {
     GhbValue * value = ghb_widget_value(widget);
-    ghb_ui_update(ud, "WhenComplete", value);
+    ud->when_complete = gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
+    ghb_ui_update(ud, "MainWhenComplete", value);
+    ghb_ui_update(ud, "QueueWhenComplete", value);
     ghb_value_free(&value);
 }
 
@@ -5075,67 +5041,50 @@ hbfd_feature_changed_cb(GtkWidget *widget, signal_user_data_t *ud)
     ghb_pref_set(ud->prefs, name);
 
     gboolean hbfd = ghb_dict_get_bool(ud->prefs, "hbfd_feature");
+    GMenu *view_menu = G_MENU(gtk_builder_get_object(ud->builder, "view-menu"));
+    GMenuModel *hbfd_menu = G_MENU_MODEL(gtk_builder_get_object(ud->builder, "hbfd-section"));
     if (hbfd)
     {
         const GhbValue *val;
         val = ghb_dict_get_value(ud->prefs, "hbfd");
         ghb_ui_settings_update(ud, ud->prefs, "hbfd", val);
+        GMenuItem *hbfd_item = g_menu_item_new_from_model(hbfd_menu, 0);
+        g_menu_prepend_item(view_menu, hbfd_item);
     }
-    widget = GHB_WIDGET(ud->builder, "hbfd");
-    gtk_widget_set_visible(widget, hbfd);
+    else
+    {
+        g_menu_remove(view_menu, 0);
+    }
 }
 
 gboolean
 ghb_file_menu_add_dvd(signal_user_data_t *ud)
 {
     GList *link, *drives;
-    static GList *dvd_items = NULL;
 
     g_debug("ghb_file_menu_add_dvd()");
-    GtkMenu *menu = GTK_MENU(GHB_WIDGET(ud->builder, "file_submenu"));
+    GMenu *dvd_menu = G_MENU(gtk_builder_get_object(ud->builder, "dvd-list"));
 
     // Clear previous dvd items from list
-    link = dvd_items;
-    while (link != NULL)
-    {
-        GtkWidget * widget = GTK_WIDGET(link->data);
-        // widget_destroy automatically removes widget from container.
-        gtk_widget_destroy(widget);
-        link = link->next;
-    }
-    g_list_free(dvd_items);
-    dvd_items = NULL;
+    g_menu_remove_all(dvd_menu);
 
-    int pos = 5;
     link = drives = dvd_device_list();
     if (drives != NULL)
     {
-        GtkWidget *widget = gtk_separator_menu_item_new();
-        dvd_items = g_list_append(dvd_items, (gpointer)widget);
-
-        gtk_menu_shell_insert(GTK_MENU_SHELL(menu), widget, pos++);
-        gtk_widget_set_visible(widget, TRUE);
+        GMenuModel *dvd_template = G_MENU_MODEL(gtk_builder_get_object(ud->builder, "dvd"));
 
         while (link != NULL)
         {
-            GtkWidget *widget;
-            gchar *drive = get_dvd_device_name(link->data);
+            gchar *action = g_strdup_printf("app.dvd-open('%s')", get_dvd_device_name(link->data));
             gchar *name = get_dvd_volume_name(link->data);
 
-            widget = gtk_menu_item_new_with_label(name);
-            gtk_buildable_set_name(GTK_BUILDABLE(widget), drive);
-            gtk_widget_set_tooltip_text(widget, _("Scan this DVD source"));
+            GMenuItem *item = g_menu_item_new_from_model(dvd_template, 0);
+            g_menu_item_set_label(item, name);
+            g_menu_item_set_detailed_action(item, action);
+            g_menu_append_item(dvd_menu, item);
 
-            dvd_items = g_list_append(dvd_items, (gpointer)widget);
-            gtk_menu_shell_insert(GTK_MENU_SHELL(menu), widget, pos++);
-
-            gtk_widget_set_visible(widget, TRUE);
-
-            // Connect signal to action (menu item)
-            g_signal_connect(widget, "activate",
-                (GCallback)dvd_source_activate_cb, ud);
             g_free(name);
-            g_free(drive);
+            g_free(action);
             free_drive(link->data);
             link = link->next;
         }
@@ -5686,8 +5635,7 @@ free_resources:
 void
 ghb_notify_done(signal_user_data_t *ud)
 {
-
-    if (ghb_settings_combo_int(ud->prefs, "WhenComplete") == 0)
+    if (ud->when_complete == 0)
         return;
 
     GNotification * notification;
@@ -5703,33 +5651,33 @@ ghb_notify_done(signal_user_data_t *ud)
     g_object_unref(G_OBJECT(notification));
     g_object_unref(G_OBJECT(icon));
 
-    if (ghb_settings_combo_int(ud->prefs, "WhenComplete") == 3)
-    {
-        if (ghb_can_shutdown_gsm())
-        {
-            ghb_countdown_dialog(GTK_MESSAGE_WARNING,
-                _("Your encode is complete."),
-                _("Shutting down the computer"),
-                _("Cancel"), (GSourceFunc)shutdown_cb, ud, 60);
-        }
-    }
-    if (ghb_settings_combo_int(ud->prefs, "WhenComplete") == 2)
-    {
-        if (ghb_can_suspend_gpm())
-        {
-            ghb_countdown_dialog(GTK_MESSAGE_WARNING,
-                _("Your encode is complete."),
-                _("Putting computer to sleep"),
-                _("Cancel"), (GSourceFunc)suspend_cb, ud, 60);
-        }
-    }
-    if (ghb_settings_combo_int(ud->prefs, "WhenComplete") == 4)
-    {
-        ghb_countdown_dialog(GTK_MESSAGE_WARNING,
-                            _("Your encode is complete."),
-                            _("Quitting Handbrake"),
-                            _("Cancel"), (GSourceFunc)quit_cb, ud, 60);
-    }
+    switch (ud->when_complete)    {
+	    case 2:
+            ghb_countdown_dialog(GTK_MESSAGE_INFO,
+                                _("Your encode is complete."),
+                                _("Quitting Handbrake"),
+                                _("Cancel"), (GSourceFunc)quit_cb, ud, 60);
+            break;
+        case 3:
+            if (ghb_can_suspend_logind())
+            {
+                ghb_countdown_dialog(GTK_MESSAGE_INFO,
+                    _("Your encode is complete."),
+                    _("Putting computer to sleep"),
+                    _("Cancel"), (GSourceFunc)suspend_cb, ud, 60);
+            }
+            break;
+	    case 4:
+            if (ghb_can_shutdown_logind())
+            {
+                ghb_countdown_dialog(GTK_MESSAGE_INFO,
+                    _("Your encode is complete."),
+                    _("Shutting down the computer"),
+                    _("Cancel"), (GSourceFunc)shutdown_cb, ud, 60);
+            }
+
+        default:
+            break;    }
 }
 
 G_MODULE_EXPORT gboolean
@@ -5826,6 +5774,29 @@ lang_combo_search(
             }
         }
     }
+}
+
+G_MODULE_EXPORT
+gboolean on_presets_list_press_cb (GtkWidget *widget,
+               GdkEvent  *event,
+               signal_user_data_t *ud)
+{
+    if((event->type == GDK_BUTTON_PRESS) && (event->button.button == 3))
+    {
+        GtkMenu *context_menu = GTK_MENU(GHB_WIDGET(ud->builder, "presets_window_submenu"));
+        gtk_menu_popup_at_pointer(context_menu, event);
+    }
+    return FALSE;
+}
+
+GtkFileFilter *ghb_add_file_filter(GtkFileChooser *chooser,
+                                   signal_user_data_t *ud,
+                                   const char *name, const char *id)
+{
+    GtkFileFilter *filter = GTK_FILE_FILTER(GHB_OBJECT(ud->builder, id));
+    gtk_file_filter_set_name(filter, name);
+    gtk_file_chooser_add_filter(chooser, filter);
+    return filter;
 }
 
 #if GTK_CHECK_VERSION(3, 90, 0)
