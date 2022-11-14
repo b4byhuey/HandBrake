@@ -22,6 +22,7 @@ jobs:
         sudo pip3 install meson
         sudo apt-get autoremove -y
         sudo apt-get autoclean
+        echo "time=$(date +"%Y-%m-%d")" >> $GITHUB_ENV
 
     - name: Setup Toolchain
       run: |
@@ -166,13 +167,12 @@ jobs:
         max-age: PT1M
         token: ${{ secrets.GITHUB_TOKEN }}
           
-    - uses: ncipollo/release-action@v1.11.1
+    - uses: ncipollo/release-action@v1.11.2
       with:
         artifacts: "win/*.*"
         name: "Snapshots for Windows"
         bodyFile: .github/build.md
-        prerelease: false
-        replacesArtifacts: true
+        prerelease: false        
         allowUpdates: false
-        tag: windows
+        tag: $time_snap
         token: ${{ secrets.GITHUB_TOKEN }}
