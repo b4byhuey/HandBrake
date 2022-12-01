@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   build_mingw:
     name: CLI / LibHB
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04.6
     steps:
     - uses: actions/checkout@v3.1.0
     - uses: actions/setup-python@v4
