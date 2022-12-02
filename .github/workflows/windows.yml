@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   build_mingw:
     name: CLI / LibHB
-    runs-on: ubuntu-20.04.5
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3.1.0
     - uses: actions/setup-python@v4
@@ -18,7 +18,7 @@ jobs:
         sudo apt-get update
         sudo apt-get upgrade -y
         sudo apt-get purge cmake -y
-        sudo apt-get install automake autoconf autopoint build-essential cmake gcc git intltool libtool libtool-bin m4 make nasm ninja-build patch pkg-config python tar zlib1g-dev
+        sudo apt-get install automake autoconf build-essential intltool libtool libtool-bin make nasm patch tar yasm zlib1g-dev ninja-build gzip pax cmake
         sudo pip3 install meson
         sudo apt-get autoremove -y
         sudo apt-get autoclean
