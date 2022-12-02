@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   build_mingw:
     name: CLI / LibHB
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v3.1.0
     - uses: actions/setup-python@v4
@@ -15,13 +15,9 @@ jobs:
 
     - name: Environment Setup
       run: |
-        sudo apt-get update
-        sudo apt-get upgrade -y
         sudo apt-get purge cmake -y
         sudo apt-get install automake autoconf build-essential intltool libtool libtool-bin make nasm patch tar yasm zlib1g-dev ninja-build gzip pax cmake
         sudo pip3 install meson
-        sudo apt-get autoremove -y
-        sudo apt-get autoclean
         echo "time=$(date +"%Y-%m-%d")" >> $GITHUB_ENV
 
     - name: Setup Toolchain
