@@ -110,13 +110,7 @@ jobs:
       uses: actions/upload-artifact@v3.1.1
       with:
         name: HandBrake-x86_64-Win_GUI-EXE
-        path: win/CS/HandBrakeWPF/bin/HandBrake/HandBrake-Nightly-x86_64-Win_GUI.exe
-
-    - name: Upload HandBrake msi Installer
-      uses: actions/upload-artifact@v3.1.1
-      with:
-        name:  HandBrake-x86_64-Win_GUI-MSI
-        path: win/CS/HandBrakeWPF/bin/HandBrake/HandBrake-Nightly-x86_64-Win_GUI.msi
+        path: win/CS/HandBrakeWPF/bin/HandBrake/HandBrake-Nightly-x86_64-Win_GUI.exe    
         
     - name: Upload HandBrake Portable
       uses: actions/upload-artifact@v3.1.1
@@ -135,14 +129,8 @@ jobs:
       uses: actions/download-artifact@v3.0.1
       with:
         name: HandBrakeCLI
-        path: win/
-          
-    - name: Download Artifacts - GUI MSI
-      uses: actions/download-artifact@v3.0.1
-      with:
-        name: HandBrake-x86_64-Win_GUI-MSI
-        path: win/
-          
+        path: win/      
+        
     - name: Download Artifacts - GUI EXE
       uses: actions/download-artifact@v3.0.1
       with:
