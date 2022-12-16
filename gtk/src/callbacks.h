@@ -1,4 +1,4 @@
-/* -*- Mode: C; indent-tabs-mode: t; c-basic-offset: 4; tab-width: 4 -*- */
+/* -*- Mode: C; indent-tabs-mode: nil; c-basic-offset: 4; tab-width: 4 -*- */
 /*
  * callbacks.h
  * Copyright (C) John Stebbins 2008-2022 <stebbins@stebbins>
@@ -96,6 +96,5 @@ void ghb_break_duration(gint64 duration, gint *hh, gint *mm, gint *ss);
 GtkFileFilter *ghb_add_file_filter(GtkFileChooser *chooser,
                                    signal_user_data_t *ud,
                                    const char *name, const char *id);
-
 #endif // _CALLBACKS_H_
 

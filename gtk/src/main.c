@@ -1,4 +1,4 @@
-/* -*- Mode: C; indent-tabs-mode: t; c-basic-offset: 4; tab-width: 4 -*- */
+/* -*- Mode: C; indent-tabs-mode: nil; c-basic-offset: 4; tab-width: 4 -*- */
 /*
  * main.c
  * Copyright (C) John Stebbins 2008-2022 <stebbins@stebbins>
@@ -654,59 +654,13 @@ const gchar *MyCSS =
 
 "#preview_hud"
 "{"
-"    border-radius: 20px;"
-"    background-color: alpha(@gray18, 0.8);"
-"    color: @white;"
+"    border-radius: 16px;"
+"    border-width: 1px;"
 "}"
 
-"#live_preview_play,"
-"#live_duration,"
-"#preview_reset"
+".preview-image-frame"
 "{"
-"    background: @black;"
-"    background-color: @gray18;"
-"    color: @white;"
-"}"
-
-"#preview_show_crop"
-"{"
-"    background-color: @gray22;"
-"    border-color: @white;"
-"    color: @white;"
-"}"
-
-"#live_encode_progress,"
-"#live_preview_progress,"
-"#preview_frame"
-"{"
-"    background: @black;"
-"    background-color: alpha(@gray18, 0.0);"
-"    color: @white;"
-"}"
-
-#if GTK_CHECK_VERSION(3, 20, 0)
-"#preview_reset:hover"
-#else
-"#preview_reset:prelight"
-#endif
-"{"
-"    background: @black;"
-"    background-color: @gray32;"
-"    color: @white;"
-"}"
-
-"#preview_reset:active"
-"{"
-"    background: @black;"
-"    background-color: @gray32;"
-"    color: @white;"
-"}"
-
-"#preview_reset:active"
-"{"
-"    background: @black;"
-"    background-color: @gray32;"
-"    color: @white;"
+"    background-color: black;"
 "}"
 
 "textview"
@@ -732,7 +686,7 @@ const gchar *MyCSS =
 "{"
 "    font-family: monospace;"
 "    font-size: 8pt;"
-"    font-weight: lighter;"
+"    font-weight: 300;"
 "}"
 #endif
 
@@ -809,9 +763,15 @@ queue_start_action_cb(GSimpleAction *action, GVariant *param, gpointer ud);
 G_MODULE_EXPORT void
 queue_pause_action_cb(GSimpleAction *action, GVariant *param, gpointer ud);
 G_MODULE_EXPORT void
+queue_play_file_action_cb(GSimpleAction *action, GVariant *param, gpointer ud);
+G_MODULE_EXPORT void
 queue_export_action_cb(GSimpleAction *action, GVariant *param, gpointer ud);
 G_MODULE_EXPORT void
 queue_import_action_cb(GSimpleAction *action, GVariant *param, gpointer ud);
+G_MODULE_EXPORT void
+queue_move_top_action_cb(GSimpleAction *action, GVariant *param, gpointer ud);
+G_MODULE_EXPORT void
+queue_move_bottom_action_cb(GSimpleAction *action, GVariant *param, gpointer ud);
 G_MODULE_EXPORT void
 queue_open_source_action_cb(GSimpleAction *action, GVariant *param, gpointer ud);
 G_MODULE_EXPORT void
@@ -825,6 +785,9 @@ queue_delete_all_action_cb(GSimpleAction *action, GVariant *param,
                            gpointer ud);
 G_MODULE_EXPORT void
 queue_delete_complete_action_cb(GSimpleAction *action, GVariant *param,
+                                gpointer ud);
+G_MODULE_EXPORT void
+queue_delete_action_cb(GSimpleAction *action, GVariant *param,
                                 gpointer ud);
 G_MODULE_EXPORT void
 queue_reset_fail_action_cb(GSimpleAction *action, GVariant *param,
@@ -865,6 +828,8 @@ preset_import_action_cb(GSimpleAction *action, GVariant *param, gpointer ud);
 G_MODULE_EXPORT void
 presets_reload_action_cb(GSimpleAction *action, GVariant *param, gpointer ud);
 G_MODULE_EXPORT void
+preview_fullscreen_action_cb(GSimpleAction *action, GVariant *param, gpointer ud);
+G_MODULE_EXPORT void
 about_action_cb(GSimpleAction *action, GVariant *param, gpointer ud);
 G_MODULE_EXPORT void
 guide_action_cb(GSimpleAction *action, GVariant *param, gpointer ud);
@@ -886,6 +851,9 @@ static void map_actions(GApplication * app, signal_user_data_t * ud)
         { "queue-add-all",         queue_add_all_action_cb         },
         { "queue-start",           queue_start_action_cb           },
         { "queue-pause",           queue_pause_action_cb           },
+        { "queue-play-file",       queue_play_file_action_cb       },
+        { "queue-move-top",        queue_move_top_action_cb        },
+        { "queue-move-bottom",     queue_move_bottom_action_cb     },
         { "queue-open-source",     queue_open_source_action_cb     },
         { "queue-open-dest",       queue_open_dest_action_cb       },
         { "queue-open-log-dir",    queue_open_log_dir_action_cb    },
@@ -893,6 +861,7 @@ static void map_actions(GApplication * app, signal_user_data_t * ud)
         { "queue-reset-fail",      queue_reset_fail_action_cb      },
         { "queue-reset-all",       queue_reset_all_action_cb       },
         { "queue-reset",           queue_reset_action_cb           },
+        { "queue-delete",          queue_delete_action_cb          },
         { "queue-delete-complete", queue_delete_complete_action_cb },
         { "queue-delete-all",      queue_delete_all_action_cb      },
         { "queue-export",          queue_export_action_cb          },
@@ -920,7 +889,9 @@ static void map_actions(GApplication * app, signal_user_data_t * ud)
         { "about",                 about_action_cb                 },
         { "guide",                 guide_action_cb                 },
         { "preset-select",         preset_select_action_cb, "s"    },
-        { "preset-reload",         preset_reload_action_cb,        },
+        { "preset-reload",         preset_reload_action_cb         },
+        { "preview-fullscreen",    NULL,
+          NULL, "false",           preview_fullscreen_action_cb    },
     };
     g_action_map_add_action_entries(G_ACTION_MAP(app), entries,
                                     G_N_ELEMENTS(entries), ud);
@@ -962,8 +933,15 @@ ghb_idle_ui_init(signal_user_data_t *ud)
     return FALSE;
 }
 
+extern G_MODULE_EXPORT void easter_egg_multi_cb (GtkGesture *gest, gint n_press, gdouble x,
+                                                 gdouble y, signal_user_data_t *ud);
+extern G_MODULE_EXPORT void preview_click_cb (GtkGesture *gest, gint n_press, gdouble x,
+                                              gdouble y, signal_user_data_t *ud);
+extern G_MODULE_EXPORT void on_presets_list_press_cb (GtkGesture *gest, gint n_press, gdouble x,
+                                                      gdouble y, signal_user_data_t *ud);
+extern G_MODULE_EXPORT void queue_button_press_cb (GtkGesture *gest, gint n_press, gdouble x,
+                                                   gdouble y, signal_user_data_t *ud);
 #if GTK_CHECK_VERSION(3, 90, 0)
-extern G_MODULE_EXPORT void easter_egg_multi_cb(void);
 extern G_MODULE_EXPORT void preview_leave_cb(void);
 extern G_MODULE_EXPORT void preview_motion_cb(void);
 extern G_MODULE_EXPORT void preview_draw_cb(GtkDrawingArea*, cairo_t*, int, int,
@@ -1050,6 +1028,7 @@ ghb_activate_cb(GApplication * app, signal_user_data_t * ud)
     gtk_widget_set_name(GHB_WIDGET(ud->builder, "preview_hud"), "preview_hud");
     gtk_widget_set_name(GHB_WIDGET(ud->builder, "preview_frame"), "preview_frame");
     gtk_widget_set_name(GHB_WIDGET(ud->builder, "live_preview_play"), "live_preview_play");
+    gtk_widget_set_name(GHB_WIDGET(ud->builder, "live_preview_fullscreen"), "live_preview_fullscreen");
     gtk_widget_set_name(GHB_WIDGET(ud->builder, "live_preview_progress"), "live_preview_progress");
     gtk_widget_set_name(GHB_WIDGET(ud->builder, "live_encode_progress"), "live_encode_progress");
     gtk_widget_set_name(GHB_WIDGET(ud->builder, "live_duration"), "live_duration");
@@ -1224,20 +1203,38 @@ ghb_activate_cb(GApplication * app, signal_user_data_t * ud)
     gtk_application_add_window(GTK_APPLICATION(app), GTK_WINDOW(window));
     window = GHB_WIDGET(ud->builder, "queue_window");
     gtk_application_add_window(GTK_APPLICATION(app), GTK_WINDOW(window));
+    window = GHB_WIDGET(ud->builder, "preview_window");
+    gtk_application_add_window(GTK_APPLICATION(app), GTK_WINDOW(window));
 
     GMenuModel *menu = G_MENU_MODEL(gtk_builder_get_object(ud->builder, "handbrake-menu"));
     gtk_application_set_menubar(GTK_APPLICATION(app), menu);
 
-#if GTK_CHECK_VERSION(3, 90, 0)
-    // GTK4 Event handling.
-    GtkGesture         * gest;
-    GtkEventController * econ;
+    GtkGesture *gest;
 
     // Easter egg multi-click
-    gest = gtk_gesture_multi_press_new();
-    widget = GHB_WIDGET(ud->builder, "easter_box");
-    gtk_widget_add_controller(widget, GTK_EVENT_CONTROLLER(gest));
-    g_signal_connect(gest, "pressed", easter_egg_multi_cb, ud);
+    widget = GHB_WIDGET(ud->builder, "eventbox1");
+    gest = ghb_gesture_click_new(widget);
+    g_signal_connect(gest, "pressed", G_CALLBACK(easter_egg_multi_cb), ud);
+
+    // Preview fullscreen multi-click
+    widget = GHB_WIDGET(ud->builder, "preview_image");
+    gest = ghb_gesture_click_new(widget);
+    g_signal_connect(gest, "pressed", G_CALLBACK(preview_click_cb), ud);
+
+    // Presets list context menu
+    widget = GHB_WIDGET(ud->builder, "presets_list");
+    gest = ghb_gesture_click_new(widget);
+    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gest), 3);
+    g_signal_connect(gest, "pressed", G_CALLBACK(on_presets_list_press_cb), ud);
+
+    // Queue list context menu
+    widget = GHB_WIDGET(ud->builder, "queue_list");
+    gest = ghb_gesture_click_new(widget);
+    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gest), 0);
+    g_signal_connect(gest, "pressed", G_CALLBACK(queue_button_press_cb), ud);
+
+#if GTK_CHECK_VERSION(3, 90, 0)
+    GtkEventController * econ;
 
     // Preview HUD popup management via mouse motion
     econ = gtk_event_controller_motion_new();

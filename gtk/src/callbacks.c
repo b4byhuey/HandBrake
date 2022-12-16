@@ -1,4 +1,4 @@
-/* -*- Mode: C; indent-tabs-mode: t; c-basic-offset: 4; tab-width: 4 -*- */
+/* -*- Mode: C; indent-tabs-mode: nil; c-basic-offset: 4; tab-width: 4 -*- */
 /*
  * callbacks.c
  * Copyright (C) John Stebbins 2008-2022 <stebbins@stebbins>
@@ -579,7 +579,7 @@ dep_check(signal_user_data_t *ud, const gchar *name, gboolean *out_hide)
             die = ghb_value_get_bool(ghb_array_get(data, 2));
             hide = ghb_value_get_bool(ghb_array_get(data, 3));
             const char *tmp = ghb_value_get_string(ghb_array_get(data, 1));
-            values = g_strsplit(tmp, "|", 10);
+            values = g_strsplit(tmp, "|", -1);
 
             if (widget)
                 value = ghb_widget_string(widget);
@@ -1304,8 +1304,7 @@ source_dialog_extra_widgets(
 {
     GtkComboBoxText *combo;
     GList *drives, *link;
-    GtkWidget *source_extra, *ok_button;
-    GtkStyleContext *ok_style;
+    GtkWidget *source_extra;
 
     g_debug("source_dialog_extra_widgets ()");
     combo = GTK_COMBO_BOX_TEXT(GHB_WIDGET(ud->builder, "source_device"));
@@ -1325,9 +1324,6 @@ source_dialog_extra_widgets(
     g_list_free(drives);
     gtk_combo_box_set_active(GTK_COMBO_BOX(combo), 0);
 
-    ok_button = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
-    ok_style = gtk_widget_get_style_context(ok_button);
-    gtk_style_context_add_class(ok_style, "suggested-action");
     source_extra = GHB_WIDGET(ud->builder, "source_extra");
     gtk_file_chooser_set_extra_widget(GTK_FILE_CHOOSER(dialog), source_extra);
 }
@@ -1786,7 +1782,7 @@ do_source_dialog(gboolean single, signal_user_data_t *ud)
 
     response = gtk_dialog_run(GTK_DIALOG (dialog));
     gtk_widget_hide(dialog);
-    if (response == GTK_RESPONSE_OK)
+    if (response == 1) // Open button clicked
     {
         gchar *filename;
 
@@ -2212,6 +2208,26 @@ static void update_meta(GhbValue *settings, const char *name, const char *val)
         ghb_dict_set_string(metadata, name, val);
 }
 
+void ghb_update_mini_preview(gboolean has_preview, signal_user_data_t *ud)
+{
+    GtkWidget *widget;
+
+    if (ghb_dict_get_bool(ud->prefs, "ShowMiniPreview") && has_preview)
+    {
+        widget = GHB_WIDGET(ud->builder, "summary_image");
+        gtk_widget_hide(widget);
+        widget = GHB_WIDGET(ud->builder, "preview_button_image");
+        gtk_widget_show(widget);
+    }
+    else
+    {
+        widget = GHB_WIDGET(ud->builder, "summary_image");
+        gtk_widget_show(widget);
+        widget = GHB_WIDGET(ud->builder, "preview_button_image");
+        gtk_widget_hide(widget);
+    }
+}
+
 void
 ghb_update_summary_info(signal_user_data_t *ud)
 {
@@ -2232,17 +2248,10 @@ ghb_update_summary_info(signal_user_data_t *ud)
         gtk_label_set_text(GTK_LABEL(widget), "");
         widget = GHB_WIDGET(ud->builder, "dimensions_summary");
         gtk_label_set_text(GTK_LABEL(widget), "--");
-        widget = GHB_WIDGET(ud->builder, "summary_image");
-        gtk_widget_show(widget);
-        widget = GHB_WIDGET(ud->builder, "preview_button_image");
-        gtk_widget_hide(widget);
+        ghb_update_mini_preview(FALSE, ud);
         return;
     }
-
-    widget = GHB_WIDGET(ud->builder, "summary_image");
-    gtk_widget_hide(widget);
-    widget = GHB_WIDGET(ud->builder, "preview_button_image");
-    gtk_widget_show(widget);
+    ghb_update_mini_preview(TRUE, ud);
 
     // Video Track
     const hb_encoder_t * video_encoder;
@@ -3624,6 +3633,7 @@ preferences_action_cb(GSimpleAction *action, GVariant *param,
 {
     GtkWidget *dialog;
 
+    prefs_require_restart = FALSE;
     dialog = GHB_WIDGET(ud->builder, "prefs_dialog");
     gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_hide(dialog);
@@ -4877,7 +4887,7 @@ activity_font_changed_cb(GtkWidget *widget, signal_user_data_t *ud)
         {                                   \n\
             font-family: monospace;         \n\
             font-size: %dpt;                \n\
-            font-weight: lighter;           \n\
+            font-weight: 300;               \n\
         }                                   \n\
         ";
     char           * css      = g_strdup_printf(css_template, size);
@@ -5031,6 +5041,16 @@ tweaks_changed_cb(GtkWidget *widget, signal_user_data_t *ud)
     ghb_widget_to_setting (ud->prefs, widget);
     const gchar *name = ghb_get_setting_key(widget);
     ghb_pref_set(ud->prefs, name);
+}
+
+G_MODULE_EXPORT void
+show_preview_changed_cb(GtkWidget *widget, signal_user_data_t *ud)
+{
+    g_debug("show_preview_changed_cb");
+    ghb_widget_to_setting (ud->prefs, widget);
+    const gchar *name = ghb_get_setting_key(widget);
+    ghb_pref_set(ud->prefs, name);
+    ghb_update_mini_preview(TRUE, ud);
 }
 
 G_MODULE_EXPORT void
@@ -5344,83 +5364,22 @@ drive_changed_cb(GVolumeMonitor *gvm, GDrive *gd, signal_user_data_t *ud)
 }
 #endif
 
-typedef struct
-{
-    gint count;
-    signal_user_data_t *ud;
-} button_click_t;
-
-static gboolean
-easter_egg_timeout_cb(button_click_t *bc)
-{
-    if (bc->count == 1)
-    {
-        GtkWidget *widget;
-        widget = GHB_WIDGET(bc->ud->builder, "allow_tweaks");
-        gtk_widget_hide(widget);
-        widget = GHB_WIDGET(bc->ud->builder, "hbfd_feature");
-        gtk_widget_hide(widget);
-    }
-    bc->count = 0;
-
-    return FALSE;
-}
-
 G_MODULE_EXPORT void
 easter_egg_multi_cb(
-    GtkGestureMultiPress * gest,
-    gint                   n_press,
-    gdouble                x,
-    gdouble                y,
-    signal_user_data_t   * ud)
+    GtkGesture         * gest,
+    gint                 n_press,
+    gdouble              x,
+    gdouble              y,
+    signal_user_data_t * ud)
 {
     if (n_press == 3)
     {
         GtkWidget *widget;
         widget = GHB_WIDGET(ud->builder, "allow_tweaks");
-        gtk_widget_show(widget);
+        gtk_widget_set_visible(widget, !gtk_widget_get_visible(widget));
         widget = GHB_WIDGET(ud->builder, "hbfd_feature");
-        gtk_widget_show(widget);
+        gtk_widget_set_visible(widget, !gtk_widget_get_visible(widget));
     }
-}
-
-G_MODULE_EXPORT gboolean
-easter_egg_cb(
-    GtkWidget *widget,
-    GdkEvent *event,
-    signal_user_data_t *ud)
-{
-    GdkEventType type = ghb_event_get_event_type(event);
-    guint        button;
-    static button_click_t bc = { .count = 0 };
-
-    bc.ud = ud;
-    ghb_event_get_button(event, &button);
-    if (type == GDK_BUTTON_PRESS && button == 1)
-    {
-        bc.count++;
-        switch (bc.count)
-        {
-            case 1:
-            {
-                g_timeout_add(500, (GSourceFunc)easter_egg_timeout_cb, &bc);
-            } break;
-
-            case 3:
-            {
-                // It's a triple left mouse button click
-                GtkWidget *widget;
-                widget = GHB_WIDGET(ud->builder, "allow_tweaks");
-                gtk_widget_show(widget);
-                widget = GHB_WIDGET(ud->builder, "hbfd_feature");
-                gtk_widget_show(widget);
-            } break;
-
-            default:
-                break;
-        }
-    }
-    return FALSE;
 }
 
 G_MODULE_EXPORT gchar*
@@ -5777,16 +5736,18 @@ lang_combo_search(
 }
 
 G_MODULE_EXPORT
-gboolean on_presets_list_press_cb (GtkWidget *widget,
-               GdkEvent  *event,
-               signal_user_data_t *ud)
+void on_presets_list_press_cb (GtkGesture *gest, gint n_press, gdouble x,
+                               gdouble y, signal_user_data_t *ud)
 {
-    if((event->type == GDK_BUTTON_PRESS) && (event->button.button == 3))
+    if (n_press == 1)
     {
         GtkMenu *context_menu = GTK_MENU(GHB_WIDGET(ud->builder, "presets_window_submenu"));
-        gtk_menu_popup_at_pointer(context_menu, event);
+#if GTK_CHECK_VERSION(3, 22, 0)
+        gtk_menu_popup_at_pointer(context_menu, NULL);
+#else
+        gtk_menu_popup(context_menu, NULL, NULL, NULL, NULL, 3, gtk_get_current_event_time());
+#endif
     }
-    return FALSE;
 }
 
 GtkFileFilter *ghb_add_file_filter(GtkFileChooser *chooser,

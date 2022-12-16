@@ -1,4 +1,4 @@
-/* -*- Mode: C; indent-tabs-mode: t; c-basic-offset: 4; tab-width: 4 -*- */
+/* -*- Mode: C; indent-tabs-mode: nil; c-basic-offset: 4; tab-width: 4 -*- */
 /*
  * subtitlehandler.c
  * Copyright (C) John Stebbins 2008-2022 <stebbins@stebbins>
@@ -1187,6 +1187,7 @@ subtitle_add_clicked_cb(GtkWidget *xwidget, signal_user_data_t *ud)
         // Pop up the edit dialog
         GtkResponseType response;
         GtkWidget *dialog = GHB_WIDGET(ud->builder, "subtitle_dialog");
+        gtk_window_set_title(GTK_WINDOW(dialog), _("Add Subtitles"));
         response = gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_hide(dialog);
         if (response != GTK_RESPONSE_OK)
@@ -1240,6 +1241,7 @@ subtitle_add_fas_clicked_cb(GtkWidget *xwidget, signal_user_data_t *ud)
 
     GtkResponseType response;
     GtkWidget *dialog = GHB_WIDGET(ud->builder, "subtitle_dialog");
+    gtk_window_set_title(GTK_WINDOW(dialog), _("Foreign Audio Scan"));
     response = gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_hide(dialog);
     if (response != GTK_RESPONSE_OK)
@@ -1251,7 +1253,7 @@ subtitle_add_fas_clicked_cb(GtkWidget *xwidget, signal_user_data_t *ud)
     }
     else
     {
-        // Disabel FAS button
+        // Disable FAS button
         GtkWidget *w = GHB_WIDGET(ud->builder, "subtitle_add_fas");
         gtk_widget_set_sensitive(w, 0);
 
@@ -1737,6 +1739,7 @@ subtitle_edit(GtkTreeView *tv, GtkTreePath *tp, signal_user_data_t *ud)
         // Pop up the edit dialog
         GtkResponseType response;
         GtkWidget *dialog = GHB_WIDGET(ud->builder, "subtitle_dialog");
+        gtk_window_set_title(GTK_WINDOW(dialog), _("Edit Subtitles"));
         response = gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_hide(dialog);
         if (response != GTK_RESPONSE_OK)

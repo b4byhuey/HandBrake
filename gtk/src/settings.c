@@ -1,4 +1,4 @@
-/* -*- Mode: C; indent-tabs-mode: t; c-basic-offset: 4; tab-width: 4 -*- */
+/* -*- Mode: C; indent-tabs-mode: nil; c-basic-offset: 4; tab-width: 4 -*- */
 /*
  * settings.c
  * Copyright (C) John Stebbins 2008-2022 <stebbins@stebbins>
@@ -572,4 +572,3 @@ ghb_ui_settings_update(
     ghb_widget_to_setting(settings, (GtkWidget*)object);
     return 0;
 }
-

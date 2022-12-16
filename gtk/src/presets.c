@@ -1,4 +1,4 @@
-/* -*- Mode: C; indent-tabs-mode: t; c-basic-offset: 4; tab-width: 4 -*- */
+/* -*- Mode: C; indent-tabs-mode: nil; c-basic-offset: 4; tab-width: 4 -*- */
 /*
  * presets.c
  * Copyright (C) John Stebbins 2008-2022 <stebbins@stebbins>
@@ -2029,7 +2029,7 @@ preset_import_action_cb(GSimpleAction *action, GVariant *param,
     GtkFileFilter   *filter;
 
     hb_window = GTK_WINDOW(GHB_WIDGET(ud->builder, "hb_window"));
-    dialog = gtk_file_chooser_dialog_new("Import Preset", hb_window,
+    dialog = gtk_file_chooser_dialog_new(_("Import Preset"), hb_window,
                 GTK_FILE_CHOOSER_ACTION_OPEN,
                 GHB_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                 GHB_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
