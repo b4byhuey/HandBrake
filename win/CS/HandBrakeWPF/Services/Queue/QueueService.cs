@@ -114,6 +114,8 @@ namespace HandBrakeWPF.Services.Queue
             }
         }
 
+        public int ActiveJobCount => this.activeJobs.Count;
+
         public int ErrorCount
         {
             get
@@ -441,6 +443,12 @@ namespace HandBrakeWPF.Services.Queue
                 }
 
                 this.queue.Remove(job);
+
+                if (this.activeJobs.Count == 0 && this.IsPaused)
+                {
+                    this.IsPaused = false;
+                }
+
                 this.InvokeQueueChanged(EventArgs.Empty);
             }
         }
@@ -529,6 +537,8 @@ namespace HandBrakeWPF.Services.Queue
             this.allowedInstances = this.userSettingService.GetUserSetting<int>(UserSettingConstants.SimultaneousEncodes);
             this.processIsolationEnabled = this.userSettingService.GetUserSetting<bool>(UserSettingConstants.ProcessIsolationEnabled);
 
+            this.IsProcessing = true;
+
             // Unpause all active jobs.
             foreach (ActiveJob job in this.activeJobs)
             {
@@ -537,7 +547,6 @@ namespace HandBrakeWPF.Services.Queue
             }
 
             this.ProcessNextJob();
-            this.IsProcessing = true;
         }
 
         public void Stop(bool stopExistingJobs)
