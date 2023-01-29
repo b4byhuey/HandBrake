@@ -512,7 +512,13 @@ namespace HandBrakeWPF.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to The format of the output file. In addition to any supported file system character, you can use the any of the placeholders that will be replaced when you change title or scan a source or update certain settings..
+        ///   Looks up a localized string similar to The format of the output file. In addition to any supported file system character, you can use the any of the placeholders that will be replaced when you change title or scan a source or update certain settings.
+        ///
+        ///{source} - Name of the source file.
+        ///{title} - Integer value. This is representative of a disc title number.
+        ///{chapters} - The range of chapters selected.
+        ///{creation-date} - The date that the source file was created on (if available).
+        ///{creation-time} - The time that the source file was created o [rest of string was truncated]&quot;;.
         /// </summary>
         public static string Options_AdditionalFormatOptions {
             get {
@@ -527,6 +533,19 @@ namespace HandBrakeWPF.Properties {
         public static string OptionsView_AlwaysUseDefaultPath {
             get {
                 return ResourceManager.GetString("OptionsView_AlwaysUseDefaultPath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The following can be used singularly, or together to build up a destination path
+        ///
+        ///{source_path} - In the same folder as the source path (if possible)
+        ///{source_folder_name} – The name of the directory that the source file is in, without the full path.
+        ///{source} - The name of the source file..
+        /// </summary>
+        public static string OptionsView_DestinationReplacementOptions {
+            get {
+                return ResourceManager.GetString("OptionsView_DestinationReplacementOptions", resourceCulture);
             }
         }
         
