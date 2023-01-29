@@ -1704,7 +1704,9 @@ namespace HandBrakeWPF.Properties {
         
         /// <summary>
         ///   Looks up a localized string similar to The file &apos;{0}&apos; already exists!
-        ///Would you like to overwrite it?.
+        ///Would you like to overwrite it?
+        ///
+        ///Hint: File overwrite behaviour can be controlled in preferences. .
         /// </summary>
         public static string Main_QueueOverwritePrompt {
             get {
@@ -3855,7 +3857,8 @@ namespace HandBrakeWPF.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Replacement Placeholders: {source} {title} {chapters} {creation-date} {creation-time} {date} {time} {quality_bitrate}.
+        ///   Looks up a localized string similar to Replacement Options:
+        ///You can drag/drop or enter the text above..
         /// </summary>
         public static string OptionsView_FormatOptions {
             get {
@@ -3889,6 +3892,15 @@ namespace HandBrakeWPF.Properties {
         public static string OptionsView_InvalidFileFormatChars {
             get {
                 return ResourceManager.GetString("OptionsView_InvalidFileFormatChars", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Use ISO Date Formats (YYYY-MM-DD) instead of system format..
+        /// </summary>
+        public static string OptionsView_IsoDateFormat {
+            get {
+                return ResourceManager.GetString("OptionsView_IsoDateFormat", resourceCulture);
             }
         }
         
@@ -3952,15 +3964,6 @@ namespace HandBrakeWPF.Properties {
         public static string OptionsView_NotSupported {
             get {
                 return ResourceManager.GetString("OptionsView_NotSupported", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Replacement Placeholders: {source_path} {source_folder_name} {source}.
-        /// </summary>
-        public static string OptionsView_PathOptions {
-            get {
-                return ResourceManager.GetString("OptionsView_PathOptions", resourceCulture);
             }
         }
         
@@ -6112,6 +6115,15 @@ namespace HandBrakeWPF.Properties {
         public static string QueueViewModel_QueueStatusDisplay {
             get {
                 return ResourceManager.GetString("QueueViewModel_QueueStatusDisplay", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Reset.
+        /// </summary>
+        public static string Reset {
+            get {
+                return ResourceManager.GetString("Reset", resourceCulture);
             }
         }
         
