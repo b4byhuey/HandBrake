@@ -854,6 +854,8 @@ namespace HandBrakeWPF.ViewModels
 
         public bool IsPresetPaneDisplayed { get; set; }
 
+        public bool IsPresetDescriptionVisible { get; set; }
+
         /* Commands */
 
         public ICommand QueueCommand { get; set; }
@@ -908,6 +910,13 @@ namespace HandBrakeWPF.ViewModels
             {
                 Thread clearLog = new Thread(() => GeneralUtilities.ClearLogFiles(7));
                 clearLog.Start();
+            }
+
+            // Preset Panel
+            if (userSettingService.GetUserSetting<bool>(UserSettingConstants.ShowPresetDesc))
+            {
+                IsPresetDescriptionVisible = true;
+                this.NotifyOfPropertyChange(() => this.IsPresetDescriptionVisible);
             }
 
             this.PictureSettingsViewModel.TabStatusChanged += this.TabStatusChanged;
@@ -1689,7 +1698,7 @@ namespace HandBrakeWPF.ViewModels
             this.NotifyOfPropertyChange(() => this.SelectedPreset);
         }
 
-        public void PresetRemove()
+        public void PresetRemoveSelected()
         {
             this.PresetRemove(this.SelectedPreset);
         }
@@ -1803,6 +1812,28 @@ namespace HandBrakeWPF.ViewModels
             }
         }
 
+        public void ExportUserPresets()
+        {
+            SaveFileDialog savefiledialog = new SaveFileDialog
+                                            {
+                                                Filter = "json|*.json",
+                                                CheckPathExists = true,
+                                                AddExtension = true,
+                                                DefaultExt = ".json",
+                                                OverwritePrompt = true,
+                                                FilterIndex = 0
+                                            };
+
+            savefiledialog.ShowDialog();
+            string filename = savefiledialog.FileName;
+
+            if (!string.IsNullOrEmpty(filename))
+            {
+                IList<PresetDisplayCategory> userPresets = this.presetService.GetPresetCategories(true);
+                this.presetService.ExportCategories(savefiledialog.FileName, userPresets);
+            }
+        }
+
         public void PresetReSelect()
         {
             this.PresetSelect(this.SelectedPreset);
@@ -1853,6 +1884,13 @@ namespace HandBrakeWPF.ViewModels
             }
 
             return false;
+        }
+
+        public void ShowHidePresetDesc()
+        {
+            this.IsPresetDescriptionVisible = !this.IsPresetDescriptionVisible;
+            this.userSettingService.SetUserSetting(UserSettingConstants.ShowPresetDesc, this.IsPresetDescriptionVisible);
+            this.NotifyOfPropertyChange(() => this.IsPresetDescriptionVisible);
         }
 
         public void StartScan(string filename, int title)
@@ -1997,6 +2035,8 @@ namespace HandBrakeWPF.ViewModels
                 this.MetaDataViewModel.SetSource(this.ScannedSource, this.SelectedTitle, this.selectedPreset, this.CurrentTask);
                 this.SummaryViewModel.SetSource(this.ScannedSource, this.SelectedTitle, this.selectedPreset, this.CurrentTask);
                 this.isSettingPreset = false;
+
+                TriggerAutonameChange(ChangedOption.Dimensions);
             }
         }
 
@@ -2084,6 +2124,12 @@ namespace HandBrakeWPF.ViewModels
             }
 
             if (autonameFormat.Contains(Constants.EncoderBitDepth) && option == ChangedOption.Encoder)
+            {
+                this.Destination = AutoNameHelper.AutoName(this.CurrentTask, this.SelectedTitle?.DisplaySourceName, this.ScannedSource?.SourceName, this.selectedPreset);
+            }
+
+
+            if ((autonameFormat.Contains(Constants.StorageWidth) || autonameFormat.Contains(Constants.StorageHeight)) && option == ChangedOption.Dimensions)
             {
                 this.Destination = AutoNameHelper.AutoName(this.CurrentTask, this.SelectedTitle?.DisplaySourceName, this.ScannedSource?.SourceName, this.selectedPreset);
             }

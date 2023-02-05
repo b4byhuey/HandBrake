@@ -15,6 +15,7 @@ namespace HandBrakeWPF.Controls
     using System.Windows.Media;
 
     using HandBrakeWPF.Helpers;
+    using HandBrakeWPF.Services.Interfaces;
     using HandBrakeWPF.Services.Presets.Interfaces;
     using HandBrakeWPF.Services.Presets.Model;
     using HandBrakeWPF.ViewModels;
@@ -23,9 +24,12 @@ namespace HandBrakeWPF.Controls
     {
         private static readonly IPresetService presetService;
 
+        private static readonly IUserSettingService userSettingService;
+
         static PresetPaneControl()
         {
             presetService = IoCHelper.Get<IPresetService>();
+            userSettingService = IoCHelper.Get<IUserSettingService>();
         }
 
         public PresetPaneControl()
@@ -127,6 +131,20 @@ namespace HandBrakeWPF.Controls
         {
             Preset preset = this.presetListTree.SelectedItem as Preset;
             this.editPresetMenuItem.IsEnabled = preset == null || !preset.IsPresetDisabled;
+        }
+
+        private void PresetOptionsBtn_OnClick(object sender, RoutedEventArgs e)
+        {
+            var button = sender as FrameworkElement;
+            if (button != null && button.ContextMenu != null)
+            {
+                button.ContextMenu.PlacementTarget = button;
+                button.ContextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+                button.ContextMenu.IsOpen = true;
+            }
+
+            bool showPresetDesc = userSettingService.GetUserSetting<bool>(UserSettingConstants.ShowPresetDesc);
+            this.presetDescMenuItem.Header = showPresetDesc ? Properties.Resources.PresetPane_HidePresetDesc : Properties.Resources.PresetPane_ShowPresetDesc;
         }
     }
 }
