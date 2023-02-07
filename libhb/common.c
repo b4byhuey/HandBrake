@@ -4136,8 +4136,11 @@ static void job_setup(hb_job_t * job, hb_title_t * title)
     job->color_prim_override     = HB_COLR_PRI_UNDEF;
     job->color_transfer_override = HB_COLR_TRA_UNDEF;
     job->color_matrix_override   = HB_COLR_MAT_UNDEF;
+
     job->mastering      = title->mastering;
     job->coll           = title->coll;
+    job->dovi           = title->dovi;
+    job->passthru_dynamic_hdr_metadata = ALL;
 
     job->mux = HB_MUX_MP4;
 
@@ -4514,6 +4517,10 @@ hb_filter_object_t * hb_filter_get( int filter_id )
 
         case HB_FILTER_RENDER_SUB:
             filter = &hb_filter_render_sub;
+            break;
+
+        case HB_FILTER_RPU:
+            filter = &hb_filter_rpu;
             break;
 
         case HB_FILTER_CROP_SCALE:

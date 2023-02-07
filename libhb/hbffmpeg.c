@@ -31,6 +31,26 @@ static int get_frame_type(int type)
     }
 }
 
+static void free_side_data(AVFrameSideData **ptr_sd)
+{
+    AVFrameSideData *sd = *ptr_sd;
+
+    av_buffer_unref(&sd->buf);
+    av_dict_free(&sd->metadata);
+    av_freep(ptr_sd);
+}
+
+static void wipe_avframe_side_data(AVFrame *frame)
+{
+    for (int i = 0; i < frame->nb_side_data; i++)
+    {
+        free_side_data(&frame->side_data[i]);
+    }
+    frame->nb_side_data = 0;
+
+    av_freep(&frame->side_data);
+}
+
 void hb_video_buffer_to_avframe(AVFrame *frame, hb_buffer_t * buf)
 {
     frame->data[0]     = buf->plane[0].data;
@@ -54,6 +74,18 @@ void hb_video_buffer_to_avframe(AVFrame *frame, hb_buffer_t * buf)
     frame->colorspace      = hb_colr_mat_hb_to_ff(buf->f.color_matrix);
     frame->color_range     = buf->f.color_range;
     frame->chroma_location = buf->f.chroma_location;
+
+    for (int i = 0; i < buf->nb_side_data; i++)
+    {
+        const AVFrameSideData *sd_src = buf->side_data[i];
+        AVBufferRef *ref = av_buffer_ref(sd_src->buf);
+        AVFrameSideData *sd_dst = av_frame_new_side_data_from_buf(frame, sd_src->type, ref);
+        if (!sd_dst)
+        {
+            av_buffer_unref(&ref);
+            wipe_avframe_side_data(frame);
+        }
+    }
 }
 
 void hb_avframe_set_video_buffer_flags(hb_buffer_t * buf, AVFrame *frame,
@@ -150,6 +182,18 @@ hb_buffer_t * hb_avframe_to_video_buffer(AVFrame *frame, AVRational time_base)
         }
     }
 #endif
+
+    for (int i = 0; i < frame->nb_side_data; i++)
+    {
+        const AVFrameSideData *sd_src = frame->side_data[i];
+        AVBufferRef *ref = av_buffer_ref(sd_src->buf);
+        AVFrameSideData *sd_dst = hb_buffer_new_side_data_from_buf(buf, sd_src->type, ref);
+        if (!sd_dst)
+        {
+            av_buffer_unref(&ref);
+            hb_buffer_wipe_side_data(buf);
+        }
+    }
 
     return buf;
 }
@@ -497,6 +541,38 @@ AVMasteringDisplayMetadata hb_mastering_hb_to_ff(hb_mastering_display_metadata_t
     ff_mastering.has_luminance = mastering.has_luminance;
 
     return ff_mastering;
+}
+
+AVDOVIDecoderConfigurationRecord hb_dovi_hb_to_ff(hb_dovi_conf_t dovi)
+{
+    AVDOVIDecoderConfigurationRecord ff_dovi;
+
+    ff_dovi.dv_version_major = dovi.dv_version_major;
+    ff_dovi.dv_version_minor = dovi.dv_version_minor;
+    ff_dovi.dv_profile = dovi.dv_profile;
+    ff_dovi.dv_level = dovi.dv_level;
+    ff_dovi.rpu_present_flag = dovi.rpu_present_flag;
+    ff_dovi.el_present_flag = dovi.el_present_flag;
+    ff_dovi.bl_present_flag = dovi.bl_present_flag;
+    ff_dovi.dv_bl_signal_compatibility_id = dovi.dv_bl_signal_compatibility_id;
+
+    return ff_dovi;
+}
+
+hb_dovi_conf_t hb_dovi_ff_to_hb(AVDOVIDecoderConfigurationRecord dovi)
+{
+    hb_dovi_conf_t hb_dovi;
+
+    hb_dovi.dv_version_major = dovi.dv_version_major;
+    hb_dovi.dv_version_minor = dovi.dv_version_minor;
+    hb_dovi.dv_profile = dovi.dv_profile;
+    hb_dovi.dv_level = dovi.dv_level;
+    hb_dovi.rpu_present_flag = dovi.rpu_present_flag;
+    hb_dovi.el_present_flag = dovi.el_present_flag;
+    hb_dovi.bl_present_flag = dovi.bl_present_flag;
+    hb_dovi.dv_bl_signal_compatibility_id = dovi.dv_bl_signal_compatibility_id;
+
+    return hb_dovi;
 }
 
 uint64_t hb_ff_mixdown_xlat(int hb_mixdown, int *downmix_mode)

@@ -11,6 +11,7 @@
 #include "libavformat/avformat.h"
 #include "handbrake/decomb.h"
 #include "handbrake/hbavfilter.h"
+#include "handbrake/dovi_common.h"
 
 #if HB_PROJECT_FEATURE_QSV
 #include "handbrake/qsv_common.h"
@@ -670,6 +671,19 @@ void hb_display_job_info(hb_job_t *job)
                        job->coll.max_cll,
                        job->coll.max_fall);
             }
+        }
+
+        if (job->passthru_dynamic_hdr_metadata & DOVI)
+        {
+            hb_log("     + dolby vision configuration record: version: %d.%d, profile: %d, level: %d, rpu flag: %d, el flag: %d, bl flag: %d, compatibility id: %d",
+                   job->dovi.dv_version_major,
+                   job->dovi.dv_version_minor,
+                   job->dovi.dv_profile,
+                   job->dovi.dv_level,
+                   job->dovi.rpu_present_flag,
+                   job->dovi.el_present_flag,
+                   job->dovi.bl_present_flag,
+                   job->dovi.dv_bl_signal_compatibility_id);
         }
     }
 
@@ -1419,6 +1433,119 @@ static void sanitize_filter_list(hb_job_t *job, hb_geometry_t src_geo)
     }
 }
 
+static int dolby_vision_level(int width, int height, hb_rational_t vrate)
+{
+    int pps = (double)width * height * (vrate.num / vrate.den);
+
+    for (int i = 0; hb_dolby_vision_levels[i].id != 0; i++)
+    {
+        if (pps < hb_dolby_vision_levels[i].max_pps)
+        {
+            return hb_dolby_vision_levels[i].id;
+        }
+    }
+
+    hb_error("work: out of bound dolby vision level, using maximum");
+    return hb_dolby_vision_levels[12].id;
+}
+
+static void update_dolby_vision_level(hb_job_t *job)
+{
+    job->dovi.dv_level = dolby_vision_level(job->width, job->height, job->vrate);
+}
+
+static void sanitize_dynamic_hdr_metadata_passthru(hb_job_t *job)
+{
+#if HB_PROJECT_FEATURE_LIBDOVI
+    hb_list_t *list = job->list_filter;
+
+    if (hb_filter_find(list, HB_FILTER_ROTATE)     != NULL ||
+        hb_filter_find(list, HB_FILTER_COLORSPACE) != NULL ||
+        job->vcodec != HB_VCODEC_X265_10BIT)
+    {
+        job->passthru_dynamic_hdr_metadata = NONE;
+        return;
+    }
+
+    if (job->dovi.dv_profile != 5 &&
+        job->dovi.dv_profile != 7 &&
+        job->dovi.dv_profile != 8)
+    {
+        // Unsupported, disable
+        job->passthru_dynamic_hdr_metadata &= ~DOVI;
+    }
+    else
+    {
+        int mode = 0;
+
+        if (job->dovi.dv_profile == 7 ||
+            (job->dovi.dv_profile == 8 && job->dovi.dv_bl_signal_compatibility_id == 6))
+        {
+            // Convert to 8.1
+            mode |= 2;
+
+            job->dovi.dv_profile = 8;
+            job->dovi.el_present_flag = 0;
+            job->dovi.dv_bl_signal_compatibility_id = 1;
+        }
+
+        if (hb_filter_find(list, HB_FILTER_CROP_SCALE) != NULL ||
+            hb_filter_find(list, HB_FILTER_PAD)        != NULL)
+        {
+            // Set the active area
+            mode |= 1;
+        }
+
+        double scale_factor_x = 1, scale_factor_y = 1;
+        int crop_top = 0, crop_bottom = 0, crop_left = 0, crop_right = 0;
+        int pad_top = 0, pad_bottom = 0, pad_left = 0, pad_right = 0;
+
+        hb_filter_object_t *filter = hb_filter_find(list, HB_FILTER_CROP_SCALE);
+        if (filter != NULL)
+        {
+            hb_dict_t *settings = filter->settings;
+            if (settings != NULL)
+            {
+                int width  = hb_dict_get_int(settings, "width");
+                int height = hb_dict_get_int(settings, "height");
+                crop_top    = hb_dict_get_int(settings, "crop-top");
+                crop_bottom = hb_dict_get_int(settings, "crop-bottom");
+                crop_left   = hb_dict_get_int(settings, "crop-left");
+                crop_right  = hb_dict_get_int(settings, "crop-right");
+
+                scale_factor_x = (float)(job->title->geometry.width - crop_right - crop_left) / width;
+                scale_factor_y = (float)(job->title->geometry.height - crop_top - crop_bottom) / height;
+            }
+        }
+
+        filter = hb_filter_find(list, HB_FILTER_PAD);
+        if (filter != NULL)
+        {
+            hb_dict_t *settings = filter->settings;
+            if (settings != NULL)
+            {
+                pad_top    = hb_dict_get_int(settings, "top");
+                pad_bottom = hb_dict_get_int(settings, "bottom");
+                pad_left   = hb_dict_get_int(settings, "left");
+                pad_right  = hb_dict_get_int(settings, "right");
+            }
+        }
+
+        filter = hb_filter_init(HB_FILTER_RPU);
+        char *settings = hb_strdup_printf("mode=%d:scale-factor-x=%f:scale-factor-y=%f:"
+                                          "crop-top=%d:crop-bottom=%d:crop-left=%d:crop-right=%d:"
+                                          "pad-top=%d:pad-bottom=%d:pad-left=%d:pad-right=%d",
+                                          mode, scale_factor_x, scale_factor_y,
+                                          crop_top, crop_bottom, crop_left, crop_right,
+                                          pad_top, pad_bottom, pad_left, pad_right);
+        hb_add_filter(job, filter, settings);
+        free(settings);
+    }
+#else
+    job->passthru_dynamic_hdr_metadata = NONE;
+#endif
+}
+
 /**
  * Job initialization routine.
  *
@@ -1487,6 +1614,7 @@ static void do_job(hb_job_t *job)
         job->input_pix_fmt = hb_get_best_pix_fmt(job);
 
         sanitize_filter_list(job, title->geometry);
+        sanitize_dynamic_hdr_metadata_passthru(job);
 
         memset(&init, 0, sizeof(init));
         init.time_base.num = 1;
@@ -1497,7 +1625,11 @@ static void do_job(hb_job_t *job)
         init.color_prim = title->color_prim;
         init.color_transfer = title->color_transfer;
         init.color_matrix = title->color_matrix;
-        init.color_range = AVCOL_RANGE_MPEG;
+        // Dolby Vision profile 5 requires full range
+        // TODO: find a better way to handle this
+        init.color_range = job->passthru_dynamic_hdr_metadata & DOVI &&
+                            job->dovi.dv_profile == 5 ?
+                            title->color_range : AVCOL_RANGE_MPEG;
         init.chroma_location = title->chroma_location;
         init.geometry = title->geometry;
         memset(init.crop, 0, sizeof(int[4]));
@@ -1581,6 +1713,10 @@ static void do_job(hb_job_t *job)
                job->orig_vrate.num,  job->orig_vrate.den);
     hb_reduce(&job->vrate.num, &job->vrate.den,
                job->vrate.num,  job->vrate.den);
+
+    // Dolby Vision level needs to be updated now that
+    // the final width, height and frame rate is known
+    update_dolby_vision_level(job);
 
     job->fifo_mpeg2  = hb_fifo_init( FIFO_SMALL, FIFO_SMALL_WAKE );
     job->fifo_raw    = hb_fifo_init( FIFO_SMALL, FIFO_SMALL_WAKE );
