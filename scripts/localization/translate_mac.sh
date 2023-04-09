@@ -1,12 +1,7 @@
-# Usage: Set environment variables, then run ./translate_linux.sh
+# Usage: Set environment variables, then run ./translate_mac.sh
 # Using your own HandBrake Fork, example:
 #     export HB_GIT_REPO=https://github.com/<your-username>/HandBrake.git
 #     export HB_BRANCH_NAME=translation_update
-# Optional:
-#     If you want to remove a translator from the files if Transifex erroneously adds it, you can add:
-#     export HB_REMOVE_TRANSLATOR="# Username <user@email>, year"
-# Please note, "HandBrake" is case sensitive!
-#
 # This works with the "Download All" zip packages transifex creates.
 #     The download all, Goto the "Resources" age, 
 #     Click on the resource to delve into it
@@ -26,14 +21,13 @@ echo ""
 echo "Using: "
 echo "Git Repo: $HB_GIT_REPO"
 echo "Git Branch: $HB_BRANCH_NAME"
-echo "Translator Removal: $HB_REMOVE_TRANSLATOR";
 echo ""
 
 # Cleanup Past Runs
 echo ""
 echo "- Tidyup any previous run"
 rm -rf HandBrake
-rm *.po
+rm *.xlf
 
 # Create a bit branch for the pull request
 echo ""
@@ -46,47 +40,31 @@ git checkout translation_update
 # Unpack
 echo ""
 echo "- Unpacking the transifex files"
-unzip handbrakeproject_linux-ui_ghbpot*.zip
+unzip handbrakeproject_mac-ui_enxliff*.zip 
 
-# Rename the files
+# Run xcode to manage the translations
 echo ""
-echo "- Renaming the files"
+echo "- Process Translation Files"
 for f in *; do
         case $f in 
-               ghbpot_*.po)
-                        [[ $f =~ ghbpot_(.*) ]]
+               enxliff_*.xlf)
+                        [[ $f =~ enxliff_(.*) ]]
                         suffix=${BASH_REMATCH[1]}
                         y="$suffix"
-                        echo "Renaming $f to $y"
-                        mv $f $y
-                        
-                        if [[ ! -z ${HB_REMOVE_TRANSLATOR} ]]; then
-                            echo "   - Cleaning Translators ..."
-                            grep -v "$HB_REMOVE_TRANSLATOR" $y > $y.tmp
-                            rm $y
-                            mv $y.tmp $y
-                        fi
-                        ;;
+                  						
+						echo "Processing $f ... "
+                        xcodebuild -importLocalizations -project /HandBrake/macosx/HandBrake.xcodeproj -localizationPath $f 
+						mv /HandBrake/macosx/build/release/external/macosx/$y.lproj/Localizable.strings /HandBrake/macosx/HandBrakeKit/$y.lproj
+						;;
         esac
 done
-
-# Change the line endings to Windows
-echo ""
-echo "- Changing Line Endings"
-dos2unix *.po
-
-# Copy the files to the correct directory
-echo ""
-echo "- Copying files to the correct directory"
-cp *.po HandBrake/gtk/po
 
 # Commit the change
 echo ""
 echo "- Creating a Git commit"
-cd HandBrake/gtk/po
-git add *.po
-cd ../../
-git commit -m "Updating Linux UI Translations"
+cd HandBrake
+git add --all
+git commit -m "Updating Mac UI Translations"
 
 echo ""
 echo "Done: git push then create a pull request on GitHub."
