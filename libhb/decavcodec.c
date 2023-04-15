@@ -239,7 +239,7 @@ static int decavcodecaInit( hb_work_object_t * w, hb_job_t * job )
         {
             case AV_CODEC_ID_AC3:
             case AV_CODEC_ID_EAC3:
-                avcodec_downmix = w->audio->config.out.normalize_mix_level == 0;
+                avcodec_downmix = w->audio->config.out.normalize_mix_level == 1;
                 break;
             case AV_CODEC_ID_DTS:
                 avcodec_downmix = w->audio->config.out.normalize_mix_level == 0;
@@ -277,14 +277,6 @@ static int decavcodecaInit( hb_work_object_t * w, hb_job_t * job )
                 }
             }
         }
-    }
-
-    // libavcodec can't decode TrueHD Mono (bug #356)
-    // work around it by requesting Stereo and downmixing
-    if (w->codec_param                     == AV_CODEC_ID_TRUEHD &&
-        w->audio->config.in.channel_layout == AV_CH_LAYOUT_MONO)
-    {
-        av_dict_set(&av_opts, "downmix", "stereo", 0);
     }
 
     // Dynamic Range Compression
@@ -331,14 +323,6 @@ static int decavcodecaInit( hb_work_object_t * w, hb_job_t * job )
     }
     pv->context->pkt_timebase.num = pv->audio->config.in.timebase.num;
     pv->context->pkt_timebase.den = pv->audio->config.in.timebase.den;
-
-    // libavcodec can't decode TrueHD Mono (bug #356)
-    // work around it by requesting Stereo and downmixing
-    if (w->codec_param                     == AV_CODEC_ID_TRUEHD &&
-        w->audio->config.in.channel_layout == AV_CH_LAYOUT_MONO)
-    {
-        pv->context->ch_layout = (AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO;
-    }
 
     // avcodec_open populates av_opts with the things it didn't recognize.
     AVDictionaryEntry *t = NULL;
@@ -733,7 +717,7 @@ static int decavcodecaBSInfo( hb_work_object_t *w, const hb_buffer_t *buf,
         parse_pos = 0;
         while (parse_pos < buf->size && !done)
         {
-            int parse_len, truehd_mono = 0, ret;
+            int parse_len, ret;
 
             if (parser != NULL)
             {
@@ -752,17 +736,6 @@ static int decavcodecaBSInfo( hb_work_object_t *w, const hb_buffer_t *buf,
             {
                 parse_pos += parse_len;
                 continue;
-            }
-
-            // libavcodec can't decode TrueHD Mono (bug #356)
-            // work around it by requesting Stereo before decoding
-            if (context->codec_id == AV_CODEC_ID_TRUEHD &&
-                context->ch_layout.u.mask == AV_CH_LAYOUT_MONO)
-            {
-                truehd_mono                     = 1;
-                AVChannelLayout ch_layout = AV_CHANNEL_LAYOUT_STEREO;
-                av_opt_set_chlayout(context, "downmix", &ch_layout, AV_OPT_SEARCH_CHILDREN);
-                context->ch_layout = ch_layout;
             }
 
             AVPacket *avp = av_packet_alloc();
@@ -819,49 +792,42 @@ static int decavcodecaBSInfo( hb_work_object_t *w, const hb_buffer_t *buf,
                         }
                     }
 
-                    if (truehd_mono)
+                    AVFrameSideData *side_data;
+                    if ((side_data =
+                         av_frame_get_side_data(frame,
+                                                AV_FRAME_DATA_MATRIXENCODING)) != NULL)
                     {
-                        info->channel_layout = AV_CH_LAYOUT_MONO;
-                        info->matrix_encoding = AV_MATRIX_ENCODING_NONE;
+                        info->matrix_encoding = *side_data->data;
                     }
                     else
                     {
-                        AVFrameSideData *side_data;
-                        if ((side_data =
-                             av_frame_get_side_data(frame,
-                                                    AV_FRAME_DATA_MATRIXENCODING)) != NULL)
-                        {
-                            info->matrix_encoding = *side_data->data;
-                        }
-                        else
-                        {
-                            info->matrix_encoding = AV_MATRIX_ENCODING_NONE;
-                        }
-                        if (info->matrix_encoding == AV_MATRIX_ENCODING_DOLBY ||
-                            info->matrix_encoding == AV_MATRIX_ENCODING_DPLII)
-                        {
-                            /*
-                             * Signal that the input uses matrix encoding via
-                             * channel layout for hb_mixdown_has_remix_support.
-                             * The latter needs this to allow the corresponding
-                             * mixdown for 2-channel matrix stereo input, said
-                             * mixdown being required to signal matrix encoding
-                             * in the *output* (when using e.g. the ac3 encoder).
-                             *
-                             * Quicker/faster than propagating side data all the
-                             * way through the pipeline, but we lose the ability
-                             * to distinguish between different matrix encodings.
-                             *
-                             * Only do this in BSInfo as overriding the layout
-                             * elsewhere could break downmixing, remapping etc.
-                             */
-                            info->channel_layout = AV_CH_LAYOUT_STEREO_DOWNMIX;
-                        }
-                        else
-                        {
-                            info->channel_layout = frame->ch_layout.u.mask;
-                        }
+                        info->matrix_encoding = AV_MATRIX_ENCODING_NONE;
                     }
+                    if (info->matrix_encoding == AV_MATRIX_ENCODING_DOLBY ||
+                        info->matrix_encoding == AV_MATRIX_ENCODING_DPLII)
+                    {
+                        /*
+                         * Signal that the input uses matrix encoding via
+                         * channel layout for hb_mixdown_has_remix_support.
+                         * The latter needs this to allow the corresponding
+                         * mixdown for 2-channel matrix stereo input, said
+                         * mixdown being required to signal matrix encoding
+                         * in the *output* (when using e.g. the ac3 encoder).
+                         *
+                         * Quicker/faster than propagating side data all the
+                         * way through the pipeline, but we lose the ability
+                         * to distinguish between different matrix encodings.
+                         *
+                         * Only do this in BSInfo as overriding the layout
+                         * elsewhere could break downmixing, remapping etc.
+                         */
+                        info->channel_layout = AV_CH_LAYOUT_STEREO_DOWNMIX;
+                    }
+                    else
+                    {
+                        info->channel_layout = frame->ch_layout.u.mask;
+                    }
+
                     if (info->channel_layout == 0)
                     {
                         // Channel layout was not set.  Guess a layout based
