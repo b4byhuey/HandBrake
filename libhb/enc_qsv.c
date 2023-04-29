@@ -201,7 +201,8 @@ static int log_encoder_params(const hb_work_private_t *pv, const mfxVideoParam *
         else if (option->Header.BufferId != MFX_EXTBUFF_VIDEO_SIGNAL_INFO &&
                  option->Header.BufferId != MFX_EXTBUFF_CHROMA_LOC_INFO &&
                  option->Header.BufferId != MFX_EXTBUFF_MASTERING_DISPLAY_COLOUR_VOLUME &&
-                 option->Header.BufferId != MFX_EXTBUFF_CONTENT_LIGHT_LEVEL_INFO)
+                 option->Header.BufferId != MFX_EXTBUFF_CONTENT_LIGHT_LEVEL_INFO &&
+                 option->Header.BufferId != MFX_EXTBUFF_AV1_BITSTREAM_PARAM)
         {
             hb_log("Unknown Header.BufferId=%d", option->Header.BufferId);
         }
@@ -1484,12 +1485,12 @@ int encqsvInit(hb_work_object_t *w, hb_job_t *job)
     {
         pv->param.rc.lookahead = pv->param.rc.lookahead && (pv->param.rc.icq || job->vquality <= HB_INVALID_VIDEO_QUALITY);
     }
-#if HB_PROJECT_FEATURE_QSV
+
     if (pv->job->qsv.ctx != NULL)
     {
         job->qsv.ctx->la_is_enabled = pv->param.rc.lookahead ? 1 : 0;
     }
-#endif
+
     // libmfx BRC parameters are 16 bits thus maybe overflow, then BRCParamMultiplier is needed
     // Comparison vbitrate in Kbps (kilobit) with vbv_max_bitrate, vbv_buffer_size, vbv_buffer_init in KB (kilobyte)
     brc_param_multiplier = (FFMAX(FFMAX3(job->vbitrate, pv->param.rc.vbv_max_bitrate, pv->param.rc.vbv_buffer_size),
@@ -2402,7 +2403,6 @@ int encqsvWork(hb_work_object_t *w, hb_buffer_t **buf_in, hb_buffer_t **buf_out)
     }
     else
     {
-#if HB_PROJECT_FEATURE_QSV
         QSVMid *mid = NULL;
         if (in->qsv_details.frame && in->qsv_details.frame->data[3])
         {
@@ -2416,7 +2416,7 @@ int encqsvWork(hb_work_object_t *w, hb_buffer_t **buf_in, hb_buffer_t **buf_out)
             hb_error("encqsv: in->qsv_details no surface available");
             goto fail;
         }
-#endif
+
         // At this point, enc_qsv takes ownership of the QSV resources
         // in the 'in' buffer.
         in->qsv_details.qsv_atom = NULL;
@@ -2517,12 +2517,12 @@ int encqsvWork(hb_work_object_t *w, hb_buffer_t **buf_in, hb_buffer_t **buf_out)
         hb_error("encqsvWork: qsv_enc_work failed %d", err);
         goto fail;
     }
-#if HB_PROJECT_FEATURE_QSV
+
     if (in->qsv_details.frame)
     {
         in->qsv_details.frame->data[3] = 0;
     }
-#endif
+
     *buf_out = hb_buffer_list_clear(&pv->encoded_frames);
     return HB_WORK_OK;
 
