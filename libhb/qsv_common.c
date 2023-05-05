@@ -491,6 +491,7 @@ int hb_qsv_info_init()
     return 0;
 }
 
+#if defined(_WIN32) || defined(__MINGW32__)
 static void hb_qsv_free_adapters_details(hb_list_t *qsv_adapters_details_list)
 {
     for (int i = 0; i < hb_list_count(qsv_adapters_details_list); i++)
@@ -502,6 +503,7 @@ static void hb_qsv_free_adapters_details(hb_list_t *qsv_adapters_details_list)
         }
     }
 }
+#endif
 
 void hb_qsv_info_close()
 {
@@ -998,6 +1000,12 @@ static int query_capabilities(mfxSession session, int index, mfxVersion version,
     /* Reset capabilities before querying */
     info->capabilities = 0;
 
+    /* Disable lowpower if the encoder is software */
+    if (hb_qsv_implementation_is_hardware(info->implementation) == 0)
+    {
+         lowpower = 0;
+    }
+
     /*
      * First of all, check availability of an encoder for
      * this combination of a codec ID and implementation.
@@ -1011,10 +1019,7 @@ static int query_capabilities(mfxSession session, int index, mfxVersion version,
             mfxStatus mfxRes;
             init_video_param(&inputParam);
             inputParam.mfx.CodecId = info->codec_id;
-            if (hb_qsv_implementation_is_hardware(info->implementation))
-            {
-                inputParam.mfx.LowPower = lowpower;
-            }
+            inputParam.mfx.LowPower = lowpower;
             memset(&videoParam, 0, sizeof(mfxVideoParam));
             videoParam.mfx.CodecId = inputParam.mfx.CodecId;
 
@@ -1107,10 +1112,7 @@ static int query_capabilities(mfxSession session, int index, mfxVersion version,
         {
             init_video_param(&inputParam);
             inputParam.mfx.CodecId           = info->codec_id;
-            if (hb_qsv_implementation_is_hardware(info->implementation))
-            {
-                inputParam.mfx.LowPower      = lowpower;
-            }
+            inputParam.mfx.LowPower          = lowpower;
             inputParam.mfx.RateControlMethod = MFX_RATECONTROL_LA;
             inputParam.mfx.TargetKbps        = 5000;
 
@@ -1125,10 +1127,7 @@ static int query_capabilities(mfxSession session, int index, mfxVersion version,
                 // also check for LA + interlaced support
                 init_video_param(&inputParam);
                 inputParam.mfx.CodecId             = info->codec_id;
-                if (hb_qsv_implementation_is_hardware(info->implementation))
-                {
-                    inputParam.mfx.LowPower        = lowpower;
-                }
+                inputParam.mfx.LowPower            = lowpower;
                 inputParam.mfx.RateControlMethod   = MFX_RATECONTROL_LA;
                 inputParam.mfx.FrameInfo.PicStruct = MFX_PICSTRUCT_FIELD_TFF;
                 inputParam.mfx.TargetKbps          = 5000;
@@ -1148,10 +1147,7 @@ static int query_capabilities(mfxSession session, int index, mfxVersion version,
         {
             init_video_param(&inputParam);
             inputParam.mfx.CodecId           = info->codec_id;
-            if (hb_qsv_implementation_is_hardware(info->implementation))
-            {
-                inputParam.mfx.LowPower      = lowpower;
-            }
+            inputParam.mfx.LowPower          = lowpower;
             inputParam.mfx.RateControlMethod = MFX_RATECONTROL_ICQ;
             inputParam.mfx.ICQQuality        = 20;
 
@@ -1172,10 +1168,7 @@ static int query_capabilities(mfxSession session, int index, mfxVersion version,
         {
             init_video_param(&videoParam);
             videoParam.mfx.CodecId = info->codec_id;
-            if (hb_qsv_implementation_is_hardware(info->implementation))
-            {
-                videoParam.mfx.LowPower = lowpower;
-            }
+            videoParam.mfx.LowPower = lowpower;
             init_ext_video_signal_info(&extVideoSignalInfo);
             videoParam.ExtParam    = videoExtParam;
             videoParam.ExtParam[0] = (mfxExtBuffer*)&extVideoSignalInfo;
@@ -1207,10 +1200,7 @@ static int query_capabilities(mfxSession session, int index, mfxVersion version,
         {
             init_video_param(&videoParam);
             videoParam.mfx.CodecId = info->codec_id;
-            if (hb_qsv_implementation_is_hardware(info->implementation))
-            {
-                videoParam.mfx.LowPower = lowpower;
-            }
+            videoParam.mfx.LowPower = lowpower;
             init_ext_coding_option(&extCodingOption);
             videoParam.ExtParam    = videoExtParam;
             videoParam.ExtParam[0] = (mfxExtBuffer*)&extCodingOption;
@@ -1246,10 +1236,7 @@ static int query_capabilities(mfxSession session, int index, mfxVersion version,
         {
             init_video_param(&videoParam);
             videoParam.mfx.CodecId = info->codec_id;
-            if (hb_qsv_implementation_is_hardware(info->implementation))
-            {
-                videoParam.mfx.LowPower = lowpower;
-            }
+            videoParam.mfx.LowPower = lowpower;
             init_ext_coding_option2(&extCodingOption2);
             videoParam.ExtParam    = videoExtParam;
             videoParam.ExtParam[0] = (mfxExtBuffer*)&extCodingOption2;
@@ -1363,10 +1350,7 @@ static int query_capabilities(mfxSession session, int index, mfxVersion version,
         {
             init_video_param(&videoParam);
             videoParam.mfx.CodecId = info->codec_id;
-            if (hb_qsv_implementation_is_hardware(info->implementation))
-            {
-                videoParam.mfx.LowPower = lowpower;
-            }
+            videoParam.mfx.LowPower = lowpower;
             init_ext_chroma_loc_info(&extChromaLocInfo);
             videoParam.ExtParam    = videoExtParam;
             videoParam.ExtParam[0] = (mfxExtBuffer*)&extChromaLocInfo;
@@ -1391,10 +1375,7 @@ static int query_capabilities(mfxSession session, int index, mfxVersion version,
         {
             init_video_param(&videoParam);
             videoParam.mfx.CodecId = info->codec_id;
-            if (hb_qsv_implementation_is_hardware(info->implementation))
-            {
-                videoParam.mfx.LowPower = lowpower;
-            }
+            videoParam.mfx.LowPower = lowpower;
             init_ext_mastering_display_colour_volume(&extMasteringDisplayColourVolume);
             videoParam.ExtParam    = videoExtParam;
             videoParam.ExtParam[0] = (mfxExtBuffer*)&extMasteringDisplayColourVolume;
@@ -1409,10 +1390,7 @@ static int query_capabilities(mfxSession session, int index, mfxVersion version,
 
             init_video_param(&videoParam);
             videoParam.mfx.CodecId = info->codec_id;
-            if (hb_qsv_implementation_is_hardware(info->implementation))
-            {
-                videoParam.mfx.LowPower = lowpower;
-            }
+            videoParam.mfx.LowPower = lowpower;
             init_ext_content_light_level_info(&extContentLightLevelInfo);
             videoParam.ExtParam    = videoExtParam;
             videoParam.ExtParam[0] = (mfxExtBuffer*)&extContentLightLevelInfo;
@@ -2205,15 +2183,14 @@ static int hb_qsv_parse_options(hb_job_t *job)
 int hb_qsv_setup_job(hb_job_t *job)
 {
     // parse the json parameter
-    if (job->qsv.ctx && job->qsv.ctx->dx_index >= 0)
+    if (job->qsv.ctx && job->qsv.ctx->dx_index >= -1)
     {
         hb_qsv_param_parse_dx_index(job, job->qsv.ctx->dx_index);
     }
+
     // parse the advanced options parameter
     hb_qsv_parse_options(job);
-    // use default if no options passed
-    if (!job->qsv.ctx->qsv_device)
-        hb_qsv_param_parse_dx_index(job, hb_qsv_get_adapter_index());
+
     int async_depth_default = hb_qsv_param_default_async_depth();
     if (job->qsv.async_depth <= 0 || job->qsv.async_depth > async_depth_default)
     {
@@ -2246,36 +2223,15 @@ int hb_qsv_is_enabled(hb_job_t *job)
     return hb_qsv_decode_is_enabled(job) || hb_qsv_encoder_info_get(hb_qsv_get_adapter_index(), job->vcodec);
 }
 
-static int hb_qsv_get_bit_depth_by_codec(int codec_id)
-{
-    int pix_fmt_bit_depth = 0;
-
-    switch (codec_id)
-    {
-        case HB_VCODEC_QSV_H264:
-        case HB_VCODEC_QSV_H265_8BIT:
-        case HB_VCODEC_QSV_AV1_8BIT:
-            pix_fmt_bit_depth = 8;
-            break;
-        case HB_VCODEC_QSV_H265_10BIT:
-        case HB_VCODEC_QSV_AV1_10BIT:
-            pix_fmt_bit_depth = 10;
-            break;
-        default:
-            break;
-    }
-    return pix_fmt_bit_depth;
-}
-
 int hb_qsv_full_path_is_enabled(hb_job_t *job)
 {
     int qsv_full_path_is_enabled = 0;
 #if defined(_WIN32) || defined(__MINGW32__)
     hb_qsv_info_t *info = hb_qsv_encoder_info_get(hb_qsv_get_adapter_index(), job->vcodec);
     int title_bit_depth = hb_get_bit_depth(job->title->pix_fmt);
-    int pix_fmt_bit_depth = hb_qsv_get_bit_depth_by_codec(job->vcodec);
+    int encoder_bit_depth = hb_video_encoder_get_depth(job->vcodec);
 
-    if (pix_fmt_bit_depth != title_bit_depth)
+    if (encoder_bit_depth != title_bit_depth)
     {
         return 0;
     }
@@ -2918,15 +2874,7 @@ int hb_qsv_param_parse(hb_qsv_param_t *param, hb_qsv_info_t *info, hb_job_t *job
     }
     else if (!strcasecmp(key, "gpu"))
     {
-        // Check if was parsed already in decoder initialization
-        if (job->qsv.ctx && !job->qsv.ctx->qsv_device)
-        {
-            int gpu_index = hb_qsv_atoi(value, &error);
-            if (!error)
-            {
-                hb_qsv_param_parse_dx_index(job, gpu_index);
-            }
-        }
+        // Already parsed in QSV initialization
     }
     else if (!strcasecmp(key, "scalingmode") ||
              !strcasecmp(key, "vpp-sm"))
@@ -3401,7 +3349,6 @@ int hb_qsv_param_default(hb_qsv_param_t *param, mfxVideoParam *videoParam,
         param->codingOption.IntraPredBlockSize   = 0; // reserved, must be 0
         param->codingOption.InterPredBlockSize   = 0; // reserved, must be 0
         param->codingOption.MVPrecision          = 0; // reserved, must be 0
-        param->codingOption.EndOfSequence        = MFX_CODINGOPTION_UNKNOWN;
         param->codingOption.RateDistortionOpt    = MFX_CODINGOPTION_UNKNOWN;
         param->codingOption.ResetRefList         = MFX_CODINGOPTION_UNKNOWN;
         param->codingOption.MaxDecFrameBuffering = 0; // unspecified
@@ -3801,8 +3748,7 @@ int hb_qsv_get_platform(int adapter_index)
     {
         const hb_qsv_adapter_details_t *details = hb_list_item(g_qsv_adapters_details_list, i);
         // find DirectX adapter with given index in list of QSV adapters
-        // if -1 use first adapter with highest priority
-        if (details && ((details->index == adapter_index) || (adapter_index == -1)))
+        if (details && (details->index == adapter_index))
         {
             return qsv_map_mfx_platform_codename(details->platform.CodeName);
         }
@@ -3816,26 +3762,15 @@ int hb_qsv_param_parse_dx_index(hb_job_t *job, const int dx_index)
     {
         const hb_qsv_adapter_details_t *details = hb_list_item(g_qsv_adapters_details_list, i);
         // find DirectX adapter with given index in list of QSV adapters
-        // if -1 use first adapter with highest priority
-        if (details && ((details->index == dx_index) || (dx_index == -1)))
+        if (details && (details->index == dx_index))
         {
-            if (job->qsv.ctx && !job->qsv.ctx->qsv_device)
-            {
-                job->qsv.ctx->qsv_device = av_calloc(32, sizeof(*job->qsv.ctx->qsv_device));
-                if (!job->qsv.ctx->qsv_device)
-                {
-                    hb_error("hb_qsv_param_parse_dx_index: failed to allocate memory for qsv device");
-                    return -1;
-                }
-            }
-            snprintf(job->qsv.ctx->qsv_device, 32, "%u", details->index);
             job->qsv.ctx->dx_index = details->index;
-            hb_log("qsv: %s qsv adapter with index %s has been selected", hb_qsv_get_adapter_type(details), job->qsv.ctx->qsv_device);
+            hb_log("qsv: %s qsv adapter with index %u has been selected", hb_qsv_get_adapter_type(details), details->index);
             hb_qsv_set_adapter_index(details->index);
             return 0;
         }
     }
-    hb_error("qsv: hb_qsv_param_parse_dx_index incorrect qsv device index %d", dx_index);
+    job->qsv.ctx->dx_index = hb_qsv_get_adapter_index();
     return -1;
 }
 
@@ -3843,73 +3778,6 @@ int hb_qsv_param_parse_dx_index(hb_job_t *job, const int dx_index)
 // Direct X
 #define COBJMACROS
 #include <d3d11.h>
-#include <dxgi1_2.h>
-#include <d3d9.h>
-#include <dxva2api.h>
-
-#if HAVE_DXGIDEBUG_H
-#include <dxgidebug.h>
-#endif
-
-typedef IDirect3D9* WINAPI pDirect3DCreate9(UINT);
-typedef HRESULT WINAPI pDirect3DCreate9Ex(UINT, IDirect3D9Ex **);
-typedef HRESULT(WINAPI *HB_PFN_CREATE_DXGI_FACTORY)(REFIID riid, void **ppFactory);
-
-static HRESULT lock_device(
-    IDirect3DDeviceManager9 *pDeviceManager,
-    BOOL fBlock,
-    IDirect3DDevice9 **ppDevice, // Receives a pointer to the device.
-    HANDLE *pHandle              // Receives a device handle.
-    )
-{
-    *pHandle = NULL;
-    *ppDevice = NULL;
-
-    HANDLE hDevice = 0;
-
-    HRESULT hr = pDeviceManager->lpVtbl->OpenDeviceHandle(pDeviceManager, &hDevice);
-
-    if (SUCCEEDED(hr))
-    {
-        hr = pDeviceManager->lpVtbl->LockDevice(pDeviceManager, hDevice, ppDevice, fBlock);
-    }
-
-    if (hr == DXVA2_E_NEW_VIDEO_DEVICE)
-    {
-        // Invalid device handle. Try to open a new device handle.
-        hr = pDeviceManager->lpVtbl->CloseDeviceHandle(pDeviceManager, hDevice);
-
-        if (SUCCEEDED(hr))
-        {
-            hr = pDeviceManager->lpVtbl->OpenDeviceHandle(pDeviceManager, &hDevice);
-        }
-
-        // Try to lock the device again.
-        if (SUCCEEDED(hr))
-        {
-            hr = pDeviceManager->lpVtbl->LockDevice(pDeviceManager, hDevice, ppDevice, TRUE);
-        }
-    }
-
-    if (SUCCEEDED(hr))
-    {
-        *pHandle = hDevice;
-    }
-    return hr;
-}
-
-static HRESULT unlock_device(
-    IDirect3DDeviceManager9 *pDeviceManager,
-    HANDLE handle              // Receives a device handle.
-    )
-{
-    HRESULT hr = pDeviceManager->lpVtbl->UnlockDevice(pDeviceManager, handle, 0);
-    if (SUCCEEDED(hr))
-    {
-        hr = pDeviceManager->lpVtbl->CloseDeviceHandle(pDeviceManager, handle);
-    }
-    return hr;
-}
 
 static int hb_qsv_find_surface_idx(const QSVMid *mids, const int nb_mids, const QSVMid *mid)
 {
@@ -4091,7 +3959,7 @@ static int hb_qsv_get_dx_device(hb_job_t *job)
             if (job->qsv.ctx->device_context == NULL)
             {
                 ID3D11Device *device = (ID3D11Device *)job->qsv.ctx->device_manager_handle;
-                ID3D11Device_GetImmediateContext(device, (ID3D11DeviceContext *)&job->qsv.ctx->device_context);
+                ID3D11Device_GetImmediateContext(device, (ID3D11DeviceContext **)&job->qsv.ctx->device_context);
                 if (!job->qsv.ctx->device_context)
                     return -1;
             }
@@ -4174,31 +4042,7 @@ static int hb_qsv_copy_surface(hb_qsv_context *ctx, void* output_surface, int ou
         return -1;
     }
 
-    if (ctx->device_manager_handle_type == MFX_HANDLE_D3D9_DEVICE_MANAGER)
-    {
-        IDirect3DDevice9 *pDevice = NULL;
-        HANDLE handle;
-
-        HRESULT result = lock_device((IDirect3DDeviceManager9 *)ctx->device_manager_handle, 1, &pDevice, &handle);
-        if (FAILED(result))
-        {
-            hb_error("hb_qsv_copy_surface: lock_device failed %d", result);
-            return -1;
-        }
-        result = IDirect3DDevice9_StretchRect(pDevice, input_surface, 0, output_surface, 0, D3DTEXF_LINEAR);
-        if (FAILED(result))
-        {
-            hb_error("hb_qsv_copy_surface: IDirect3DDevice9_StretchRect failed %d", result);
-            return -1;
-        }
-        result = unlock_device((IDirect3DDeviceManager9 *)ctx->device_manager_handle, handle);
-        if (FAILED(result))
-        {
-            hb_error("hb_qsv_copy_surface: unlock_device failed %d", result);
-            return -1;
-        }
-    }
-    else if (ctx->device_manager_handle_type == MFX_HANDLE_D3D11_DEVICE)
+    if (ctx->device_manager_handle_type == MFX_HANDLE_D3D11_DEVICE)
     {
         ID3D11DeviceContext_CopySubresourceRegion((ID3D11DeviceContext *)ctx->device_context, output_surface, output_index, 0, 0, 0, input_surface, input_index, NULL);
         ID3D11DeviceContext_Flush((ID3D11DeviceContext *)ctx->device_context);
@@ -4518,11 +4362,6 @@ void hb_qsv_uninit_enc(hb_job_t *job)
         av_buffer_unref(&job->qsv.ctx->hb_hw_device_ctx);
         job->qsv.ctx->hb_hw_device_ctx = NULL;
     }
-    if (job->qsv.ctx && job->qsv.ctx->qsv_device)
-    {
-        av_free(job->qsv.ctx->qsv_device);
-        job->qsv.ctx->qsv_device = NULL;
-    }
     job->qsv.ctx->device_manager_handle = NULL;
 }
 
@@ -4531,11 +4370,15 @@ static int hb_qsv_ffmpeg_set_options(hb_job_t *job, AVDictionary** dict)
     int err;
     AVDictionary* out_dict = *dict;
 
-    if (job->qsv.ctx && job->qsv.ctx->qsv_device)
+    if (job->qsv.ctx && job->qsv.ctx->dx_index > 0)
     {
-        err = av_dict_set(&out_dict, "child_device", job->qsv.ctx->qsv_device, 0);
+        char device[32];
+        snprintf(device, 32, "%u", job->qsv.ctx->dx_index);
+        err = av_dict_set(&out_dict, "child_device", device, 0);
         if (err < 0)
+        {
             return err;
+        }
     }
     else
     {
@@ -4632,9 +4475,6 @@ int hb_create_ffmpeg_pool(hb_job_t *job, int coded_width, int coded_height, enum
             }
             hb_dict_free(&options_list);
         }
-
-        if (!job->qsv.ctx->qsv_device)
-            hb_qsv_param_parse_dx_index(job, hb_qsv_get_adapter_index());
 
         ret = hb_qsv_device_init(job);
         if (ret < 0)

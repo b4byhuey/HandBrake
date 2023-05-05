@@ -1161,7 +1161,7 @@ int encqsvInit(hb_work_object_t *w, hb_job_t *job)
     hb_work_private_t *pv = calloc(1, sizeof(hb_work_private_t));
     w->private_data       = pv;
 
-    pv->is_sys_mem         = hb_qsv_full_path_is_enabled(job) ? 0 : 1; // TODO: re-implement QSV VPP filtering support
+    pv->is_sys_mem         = hb_qsv_full_path_is_enabled(job) ? 0 : 1;
     pv->job                = job;
     pv->qsv_info           = hb_qsv_encoder_info_get(hb_qsv_get_adapter_index(), job->vcodec);
     pv->delayed_processing = hb_list_init();
@@ -1275,9 +1275,6 @@ int encqsvInit(hb_work_object_t *w, hb_job_t *job)
 #if defined(_WIN32) || defined(__MINGW32__)
     if (pv->is_sys_mem && hb_qsv_implementation_is_hardware(pv->qsv_info->implementation))
     {
-        // select the right hardware implementation based on dx index
-        if (!job->qsv.ctx->qsv_device)
-            hb_qsv_param_parse_dx_index(pv->job, hb_qsv_get_adapter_index());
         mfxIMPL hw_preference = MFX_IMPL_VIA_D3D11;
         pv->qsv_info->implementation = hb_qsv_dx_index_to_impl(job->qsv.ctx->dx_index) | hw_preference;
     }
@@ -1661,18 +1658,6 @@ int encqsvInit(hb_work_object_t *w, hb_job_t *job)
 
     /* MFXVideoENCODE_Init with desired encoding parameters */
     sts = MFXVideoENCODE_Init(session, pv->param.videoParam);
-// workaround for the early 15.33.x driver, should be removed later
-#define HB_DRIVER_FIX_33
-#ifdef  HB_DRIVER_FIX_33
-    int la_workaround = 0;
-    if (sts < MFX_ERR_NONE &&
-        pv->param.videoParam->mfx.RateControlMethod == MFX_RATECONTROL_LA)
-    {
-        pv->param.videoParam->mfx.RateControlMethod = MFX_RATECONTROL_CBR;
-        sts = MFXVideoENCODE_Init(session, pv->param.videoParam);
-        la_workaround = 1;
-    }
-#endif
     if (sts < MFX_ERR_NONE) // ignore warnings
     {
         hb_error("encqsvInit: MFXVideoENCODE_Init failed (%d)", sts);
@@ -1766,16 +1751,6 @@ int encqsvInit(hb_work_object_t *w, hb_job_t *job)
 
     /* We don't need this encode session once we have the header */
     MFXVideoENCODE_Close(session);
-
-#ifdef HB_DRIVER_FIX_33
-    if (la_workaround)
-    {
-        videoParam.mfx.RateControlMethod =
-        pv->param.videoParam->mfx.RateControlMethod = MFX_RATECONTROL_LA;
-        option2->LookAheadDepth = pv->param.codingOption2.LookAheadDepth;
-        hb_log("encqsvInit: using LookAhead workaround (\"early 33 fix\")");
-    }
-#endif
 
     // when using system memory, we re-use this same session
     if (pv->is_sys_mem)
