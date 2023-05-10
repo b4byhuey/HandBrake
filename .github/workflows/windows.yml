@@ -21,7 +21,7 @@ jobs:
     - name: Environment Setup
       run: |
         sudo apt-get purge cmake -y
-        sudo apt-get install automake autoconf build-essential intltool libtool libtool-bin make nasm patch tar yasm zlib1g-dev ninja-build gzip pax cmake libssl-dev
+        sudo apt-get install automake autoconf build-essential libtool libtool-bin make nasm patch tar yasm zlib1g-dev ninja-build gzip pax cmake libssl-dev
         sudo pip3 install meson
         rustup target add x86_64-pc-windows-gnu
         echo "time=$(date +"%Y-%m-%d")" >> $GITHUB_ENV
