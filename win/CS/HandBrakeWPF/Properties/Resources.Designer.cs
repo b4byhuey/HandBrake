@@ -5090,6 +5090,42 @@ namespace HandBrakeWPF.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Move Down.
+        /// </summary>
+        public static string PresetPane_MoveDown {
+            get {
+                return ResourceManager.GetString("PresetPane_MoveDown", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Move to Bottom.
+        /// </summary>
+        public static string PresetPane_MoveToBottom {
+            get {
+                return ResourceManager.GetString("PresetPane_MoveToBottom", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Move to Top.
+        /// </summary>
+        public static string PresetPane_MoveToTop {
+            get {
+                return ResourceManager.GetString("PresetPane_MoveToTop", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Move Up.
+        /// </summary>
+        public static string PresetPane_MoveUp {
+            get {
+                return ResourceManager.GetString("PresetPane_MoveUp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Show Preset Description.
         /// </summary>
         public static string PresetPane_ShowPresetDesc {
@@ -6223,6 +6259,15 @@ namespace HandBrakeWPF.Properties {
         public static string QueueViewModel_ShortSubScanStatus {
             get {
                 return ResourceManager.GetString("QueueViewModel_ShortSubScanStatus", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to There are currently jobs running. Would you like to complete the current jobs before stopping the queue?.
+        /// </summary>
+        public static string QueueViewModel_StopButContinueJob {
+            get {
+                return ResourceManager.GetString("QueueViewModel_StopButContinueJob", resourceCulture);
             }
         }
         

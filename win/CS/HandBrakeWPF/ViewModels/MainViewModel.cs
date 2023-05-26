@@ -206,6 +206,8 @@ namespace HandBrakeWPF.ViewModels
 
         public ICommand PresetClone { get; set; }
 
+        public ICommand PresetMove => new PresetMoveCommand(this, this.presetService);
+
         /* View Model Properties */
 
         public IPictureSettingsViewModel PictureSettingsViewModel { get; set; }
@@ -1437,6 +1439,11 @@ namespace HandBrakeWPF.ViewModels
         public void TogglePresetPane()
         {
             this.IsPresetPaneDisplayed = !this.IsPresetPaneDisplayed;
+            if (!this.IsPresetPaneDisplayed)
+            {
+                this.presetService.Save(); // Save any updates on close. I.e moves
+            }
+
             this.NotifyOfPropertyChange(() => IsPresetPaneDisplayed);
         }
 
@@ -1521,6 +1528,7 @@ namespace HandBrakeWPF.ViewModels
                 CheckPathExists = true, 
                 AddExtension = true, 
                 DefaultExt = ".mp4",
+                RestoreDirectory = true
             };
 
             saveFileDialog.OverwritePrompt =
