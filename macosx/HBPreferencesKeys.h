@@ -32,11 +32,14 @@ extern NSString * const HBAlertWhenDoneSound;
 extern NSString * const HBSendToAppEnabled;
 extern NSString * const HBSendToApp;
 
+extern NSString * const HBUseSourceFolderDestination;
+
 extern NSString * const HBDefaultAutoNaming;
 extern NSString * const HBAutoNamingFormat;
 extern NSString * const HBAutoNamingRemoveUnderscore;
 extern NSString * const HBAutoNamingRemovePunctuation;
 extern NSString * const HBAutoNamingTitleCase;
+extern NSString * const HBAutoNamingISODateFormat;
 
 extern NSString * const HBCqSliderFractional;
 extern NSString * const HBUseDvdNav;

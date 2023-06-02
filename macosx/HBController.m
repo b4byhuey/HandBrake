@@ -46,6 +46,11 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
 @property (nonatomic, readonly, strong) HBCore *core;
 @property (nonatomic, readonly, strong) HBAppDelegate *delegate;
 
+@property (nonatomic, strong) HBSecurityAccessToken *fileToken;
+@property (nonatomic, strong) NSURL *destinationFolderURL;
+@property (nonatomic, strong) HBSecurityAccessToken *destinationFolderToken;
+
+
 @property (nonatomic, weak) IBOutlet NSTextField *sourceLabel;
 @property (nonatomic, weak) IBOutlet NSPopUpButton *titlePopUp;
 @property (nonatomic, weak) IBOutlet NSPathControl *destinationPathControl;
@@ -104,8 +109,6 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
 @property (nonatomic) NSInteger scanSpecificTitleIdx;
 
 #pragma mark - Job
-
-@property (nonatomic, strong) NSURL *destinationFolderURL;
 
 @property (nonatomic, nullable) HBJob *job;
 @property (nonatomic, nullable) HBAutoNamer *autoNamer;
@@ -178,7 +181,7 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
         }
 
 #ifdef __SANDBOX_ENABLED__
-        [_destinationFolderURL startAccessingSecurityScopedResource];
+        _destinationFolderToken = [HBSecurityAccessToken tokenWithObject:_destinationFolderURL];
 #endif
     }
 
@@ -774,9 +777,42 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
     }
 }
 
+- (void)showOpenPanelForDestination:(NSURL *)destinationURL
+{
+    NSOpenPanel *panel = [NSOpenPanel openPanel];
+    panel.canChooseFiles = NO;
+    panel.canChooseDirectories = YES;
+    panel.directoryURL = destinationURL;
+    panel.message = NSLocalizedString(@"HandBrake does not have permission to write to this folder. To allow HandBrake to write to this folder, click \"Allow\"", @"Main Window -> Same as source destination open panel");
+    panel.prompt = NSLocalizedString(@"Allow", @"Main Window -> Same as source destination open panel");
+
+    [panel beginSheetModalForWindow:self.window completionHandler:^(NSInteger result)
+     {
+         if (result == NSModalResponseOK)
+         {
+             self.destinationFolderURL = panel.URL;
+             self.destinationFolderToken = [HBSecurityAccessToken tokenWithAlreadyAccessedObject:panel.URL];
+         }
+     }];
+}
+
+- (void)askForPermissionAndSetDestinationURL:(NSURL *)destinationURL
+{
+    if (![self.destinationFolderURL isEqualTo:destinationURL])
+    {
+#ifdef __SANDBOX_ENABLED__
+            [self showOpenPanelForDestination:destinationURL];
+#else
+            self.destinationFolderURL = destinationURL;
+#endif
+    }
+}
+
 - (void)openURL:(NSURL *)fileURL titleIndex:(NSUInteger)index
 {
     [self showWindow:self];
+
+    self.fileToken = [HBSecurityAccessToken tokenWithAlreadyAccessedObject:fileURL];
 
     [self scanURL:fileURL titleIndex:index completionHandler:^(NSArray<HBTitle *> *titles)
     {
@@ -797,6 +833,10 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
             if (job)
             {
                 self.job = job;
+                if (featuredTitle.isStream && [NSUserDefaults.standardUserDefaults boolForKey:HBUseSourceFolderDestination])
+                {
+                    [self askForPermissionAndSetDestinationURL:job.fileURL.URLByDeletingLastPathComponent];
+                }
             }
             else
             {
@@ -824,27 +864,13 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
     if (self.core.state != HBStateScanning)
     {
         [job refreshSecurityScopedResources];
+        self.fileToken = [HBSecurityAccessToken tokenWithObject:job.fileURL];
+
         [self scanURL:job.fileURL titleIndex:job.titleIdx completionHandler:^(NSArray<HBTitle *> *titles)
         {
             if (titles.count)
             {
-                // If the scan was cached, reselect
-                // the original title
-                for (HBTitle *title in titles)
-                {
-                    if (title.index == job.titleIdx)
-                    {
-                        job.title = title;
-                        break;
-                    }
-                }
-
-                // Else just one title or a title specific rescan
-                // select the first title
-                if (!job.title)
-                {
-                    job.title = titles.firstObject;
-                }
+                job.title = titles.firstObject;
 
                 self.job = job;
                 job.undo = self.window.undoManager;
@@ -1033,8 +1059,6 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
                                               forKey:HBLastDestinationDirectoryBookmark];
     [NSUserDefaults.standardUserDefaults setURL:destinationFolderURL
                                          forKey:HBLastDestinationDirectoryURL];
-
-
 }
 
 - (IBAction)browseDestination:(id)sender
@@ -1056,6 +1080,7 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
          if (result == NSModalResponseOK)
          {
              self.destinationFolderURL = panel.URL;
+             self.destinationFolderToken = [HBSecurityAccessToken tokenWithAlreadyAccessedObject:panel.URL];
          }
      }];
 }
@@ -1086,6 +1111,7 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
         if (URL.hasDirectoryPath)
         {
             self.destinationFolderURL = URL;
+            self.destinationFolderToken = [HBSecurityAccessToken tokenWithAlreadyAccessedObject:URL];
         }
         return YES;
     }
