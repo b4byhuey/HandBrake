@@ -788,15 +788,6 @@ int hb_qsv_video_encoder_is_enabled(int adapter_index, int encoder)
     }
 }
 
-int hb_qsv_audio_encoder_is_enabled(int encoder)
-{
-    switch (encoder)
-    {
-        default:
-            return 0;
-    }
-}
-
 static void init_video_param(mfxVideoParam *videoParam)
 {
     if (videoParam == NULL)
@@ -2229,28 +2220,17 @@ int hb_qsv_full_path_is_enabled(hb_job_t *job)
         return 0;
     }
 
+    // there isn't any rotate hw filter yet, fallback to sw filters
+    if (job->title->rotation)
+    {
+        return 0;
+    }
+
     qsv_full_path_is_enabled = (hb_qsv_decode_is_enabled(job) &&
         info && hb_qsv_implementation_is_hardware(info->implementation) &&
         job->qsv.ctx && !job->qsv.ctx->num_sw_filters);
 #endif
     return qsv_full_path_is_enabled;
-}
-
-int hb_qsv_copyframe_is_slow(int encoder)
-{
-    hb_qsv_info_t *info = hb_qsv_encoder_info_get(hb_qsv_get_adapter_index(), encoder);
-    if (info != NULL && hb_qsv_implementation_is_hardware(info->implementation))
-    {
-        hb_qsv_adapter_details_t* details = hb_qsv_get_adapters_details_by_index(hb_qsv_get_adapter_index());
-        if (details)
-        {
-            // we should really check the driver version, but since it's not
-            // available, checking the API version is the best we can do :-(
-            return !HB_CHECK_MFX_VERSION(details->qsv_hardware_version, 1, 7);
-        }
-        return 0;
-    }
-    return 0;
 }
 
 int hb_qsv_codingoption_xlat(int val)
@@ -3713,20 +3693,6 @@ const char* hb_qsv_impl_get_via_name(int impl)
     else if ((impl & 0xF00) == MFX_IMPL_VIA_ANY)
         return "via ANY";
     else return NULL;
-}
-
-void hb_qsv_force_workarounds()
-{
-#define FORCE_WORKAROUNDS ~(HB_QSV_CAP_OPTION2_BREFTYPE)
-    hb_qsv_adapter_details_t* details = hb_qsv_get_adapters_details_by_index(hb_qsv_get_adapter_index());
-    if (details)
-    {
-        details->qsv_software_info_avc.capabilities  &= FORCE_WORKAROUNDS;
-        details->qsv_hardware_info_avc.capabilities  &= FORCE_WORKAROUNDS;
-        details->qsv_software_info_hevc.capabilities &= FORCE_WORKAROUNDS;
-        details->qsv_hardware_info_hevc.capabilities &= FORCE_WORKAROUNDS;
-    }
-#undef FORCE_WORKAROUNDS
 }
 
 int hb_qsv_get_platform(int adapter_index)
