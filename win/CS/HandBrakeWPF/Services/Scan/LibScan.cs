@@ -43,7 +43,7 @@ namespace HandBrakeWPF.Services.Scan
 
         private TitleFactory titleFactory = new TitleFactory();
         private string currentSourceScanPath;
-        private IHandBrakeInstance instance;
+        private IScanInstance instance;
         private Action<bool, Source> postScanOperation;
         private bool isCancelled = false;
 
@@ -179,7 +179,10 @@ namespace HandBrakeWPF.Services.Scan
                 EncodeTaskFactory factory = new EncodeTaskFactory(this.userSettingService);
                 JsonEncodeObject jobDict = factory.Create(job);
                 RawPreviewData bitmapData = this.instance.GetPreview(jobDict, preview);
-                bitmapImage = BitmapUtilities.ConvertToBitmapImage(BitmapUtilities.ConvertByteArrayToBitmap(bitmapData));
+                if (bitmapData != null)
+                {
+                    bitmapImage = BitmapUtilities.ConvertToBitmapImage(BitmapUtilities.ConvertByteArrayToBitmap(bitmapData));
+                }
             }
             catch (AccessViolationException e)
             {
@@ -226,8 +229,10 @@ namespace HandBrakeWPF.Services.Scan
 
                 HandBrakeUtils.SetDvdNav(!this.userSettingService.GetUserSetting<bool>(UserSettingConstants.DisableLibDvdNav));
 
+                List<string> excludedExtensions = this.userSettingService.GetUserSetting<List<string>>(UserSettingConstants.ExcludedExtensions);
+
                 this.ServiceLogMessage("Starting Scan ...");
-                this.instance.StartScan(sourcePath.ToString(), previewCount, minDuration, title != 0 ? title : 0);
+                this.instance.StartScan(sourcePath.ToString(), previewCount, minDuration, title != 0 ? title : 0, excludedExtensions);
 
                 this.ScanStarted?.Invoke(this, System.EventArgs.Empty);
             }
