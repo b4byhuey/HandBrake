@@ -4643,6 +4643,16 @@ hb_filter_object_t * hb_filter_get( int filter_id )
             filter = &hb_filter_mt_frame;
             break;
 
+#if defined(__APPLE__)
+        case HB_FILTER_CROP_SCALE_VT:
+            filter = &hb_filter_crop_scale_vt;
+            break;
+
+        case HB_FILTER_ROTATE_VT:
+            filter = &hb_filter_rotate_vt;
+            break;
+#endif
+
         default:
             filter = NULL;
             break;
@@ -6325,10 +6335,16 @@ static int pix_fmt_is_supported(hb_job_t *job, int pix_fmt)
 
 static const enum AVPixelFormat pipeline_pix_fmts[] =
 {
-    AV_PIX_FMT_YUV444P12, AV_PIX_FMT_YUV444P10, AV_PIX_FMT_YUV444P,
-    AV_PIX_FMT_YUV422P12, AV_PIX_FMT_YUV422P10, AV_PIX_FMT_YUV422P,
-    AV_PIX_FMT_YUV420P12, AV_PIX_FMT_P010, AV_PIX_FMT_YUV420P10,
-    AV_PIX_FMT_NV12, AV_PIX_FMT_YUV420P, AV_PIX_FMT_NONE
+    AV_PIX_FMT_YUV444P12,
+    AV_PIX_FMT_P410, AV_PIX_FMT_YUV444P10,
+    AV_PIX_FMT_NV24, AV_PIX_FMT_YUV444P,
+    AV_PIX_FMT_YUV422P12,
+    AV_PIX_FMT_P210, AV_PIX_FMT_YUV422P10,
+    AV_PIX_FMT_NV16, AV_PIX_FMT_YUV422P,
+    AV_PIX_FMT_YUV420P12,
+    AV_PIX_FMT_P010, AV_PIX_FMT_YUV420P10,
+    AV_PIX_FMT_NV12, AV_PIX_FMT_YUV420P,
+    AV_PIX_FMT_NONE
 };
 
 int hb_get_best_pix_fmt(hb_job_t * job)

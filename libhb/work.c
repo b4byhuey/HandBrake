@@ -18,6 +18,10 @@
 #include "handbrake/qsv_common.h"
 #endif
 
+#ifdef __APPLE__
+#include "platform/macosx/vt_common.h"
+#endif
+
 typedef struct
 {
     hb_list_t * jobs;
@@ -1359,7 +1363,7 @@ static int sanitize_audio(hb_job_t *job)
     return 0;
 }
 
-static void sanitize_filter_list(hb_job_t *job, hb_geometry_t src_geo)
+static void sanitize_filter_list_pre(hb_job_t *job, hb_geometry_t src_geo)
 {
     hb_list_t *list = job->list_filter;
 
@@ -1416,8 +1420,15 @@ static void sanitize_filter_list(hb_job_t *job, hb_geometry_t src_geo)
 #endif
 }
 
-static void sanitize_filter_format(hb_job_t *job)
+static void sanitize_filter_list_post(hb_job_t *job)
 {
+#ifdef __APPLE__
+    if (job->hw_pix_fmt == AV_PIX_FMT_VIDEOTOOLBOX)
+    {
+        hb_vt_setup_hw_filters(job);
+    }
+#endif
+
     if (job->hw_pix_fmt == AV_PIX_FMT_NONE &&
         hb_video_encoder_pix_fmt_is_supported(job->vcodec, job->input_pix_fmt, job->encoder_profile) == 0)
     {
@@ -1482,7 +1493,6 @@ static void sanitize_dynamic_hdr_metadata_passthru(hb_job_t *job)
     }
 
     if (job->vcodec != HB_VCODEC_X265_10BIT &&
-        job->vcodec != HB_VCODEC_VT_H265_10BIT &&
         job->vcodec != HB_VCODEC_SVT_AV1_10BIT)
     {
         job->passthru_dynamic_hdr_metadata &= ~HDR_10_PLUS;
@@ -1632,7 +1642,7 @@ static void do_job(hb_job_t *job)
     {
         hb_filter_init_t init;
 
-        sanitize_filter_list(job, title->geometry);
+        sanitize_filter_list_pre(job, title->geometry);
 
         // Select the optimal pixel formats for the pipeline
         job->hw_pix_fmt = hb_get_best_hw_pix_fmt(job);
@@ -1644,8 +1654,8 @@ static void do_job(hb_job_t *job)
             hb_hwaccel_hw_ctx_init(job);
         }
 
-        sanitize_filter_format(job);
         sanitize_dynamic_hdr_metadata_passthru(job);
+        sanitize_filter_list_post(job);
 
         memset(&init, 0, sizeof(init));
         init.time_base.num = 1;

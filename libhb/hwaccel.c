@@ -10,6 +10,10 @@
 #include "handbrake/hbffmpeg.h"
 #include "handbrake/handbrake.h"
 
+#ifdef __APPLE__
+#include "platform/macosx/vt_common.h"
+#endif
+
 enum AVHWDeviceType hb_hwaccel_available(int codec_id, const char *hwdevice_name)
 {
     if (is_hardware_disabled())
@@ -72,11 +76,11 @@ int hb_hwaccel_hw_ctx_init(hb_job_t *job)
 
     const AVCodec *codec = avcodec_find_decoder(job->title->video_codec_param);
 
-    if (job->hw_decode == HB_DECODE_SUPPORT_VIDEOTOOLBOX)
+    if (job->hw_decode & HB_DECODE_SUPPORT_VIDEOTOOLBOX)
     {
         hw_type = av_hwdevice_find_type_by_name("videotoolbox");
     }
-    else if (job->hw_decode == HB_DECODE_SUPPORT_NVDEC)
+    else if (job->hw_decode & HB_DECODE_SUPPORT_NVDEC)
     {
         hw_type = av_hwdevice_find_type_by_name("cuda");
     }
@@ -268,33 +272,48 @@ static int is_codec_supported(int codec_id)
     }
 }
 
-static int are_filters_supported(hb_list_t *filters)
+int hb_nvenc_are_filters_supported(hb_list_t *filters)
 {
     int ret = 1;
 
     for (int i = 0; i < hb_list_count(filters); i++)
     {
+        int supported = 1;
         hb_filter_object_t *filter = hb_list_item(filters, i);
+
         switch (filter->id)
         {
             case HB_FILTER_VFR:
-            {
                 // Mode 0 doesn't require access to the frame data
-                int mode = hb_dict_get_int(filter->settings, "mode");
-                if (mode == 0)
-                {
-                    break;
-                }
-            }
-            // TODO: enable after fixing hw crop
-            //case HB_FILTER_CROP_SCALE:
-            //case HB_FILTER_AVFILTER:
-            //    break;
-            default:
-                hb_deep_log(2, "hwaccel: %s isn't yet supported for hw video frames", filter->name);
-                ret = 0;
+                supported = hb_dict_get_int(filter->settings, "mode") == 0;
                 break;
+            default:
+                supported = 0;
         }
+
+        if (supported == 0)
+        {
+            hb_deep_log(2, "hwaccel: %s isn't yet supported for hw video frames", filter->name);
+            ret = 0;
+        }
+    }
+
+    return ret;
+}
+
+static int are_filters_supported(hb_list_t *filters, int hw_decode)
+{
+    int ret = 0;
+
+#ifdef __APPLE__
+    if (hw_decode & HB_DECODE_SUPPORT_VIDEOTOOLBOX)
+    {
+        ret = hb_vt_are_filters_supported(filters);
+    }
+#endif
+    if (hw_decode & HB_DECODE_SUPPORT_NVDEC)
+    {
+        ret = hb_nvenc_are_filters_supported(filters);
     }
 
     return ret;
@@ -310,11 +329,25 @@ int hb_hwaccel_is_enabled(hb_job_t *job)
 int hb_hwaccel_is_full_hardware_pipeline_enabled(hb_job_t *job)
 {
     return hb_hwaccel_is_enabled(job) &&
-            are_filters_supported(job->list_filter) &&
+            are_filters_supported(job->list_filter, job->hw_decode) &&
             is_codec_supported(job->vcodec);
 }
 
 int hb_hwaccel_decode_is_enabled(hb_job_t *job)
 {
-    return hb_hwaccel_is_full_hardware_pipeline_enabled(job);
+    if (job != NULL)
+    {
+        if (job->hw_decode & HB_DECODE_SUPPORT_FORCE_HW)
+        {
+            return hb_hwaccel_is_enabled(job);
+        }
+        else
+        {
+            return hb_hwaccel_is_full_hardware_pipeline_enabled(job);
+        }
+    }
+    else
+    {
+        return 0;
+    }
 }
