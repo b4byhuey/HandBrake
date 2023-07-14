@@ -322,7 +322,8 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
     NSArray<NSURL *> *fileURLs = [self fileURLsFromPasteboard:[sender draggingPasteboard]];
     if (fileURLs.count)
     {
-        [self openURLs:fileURLs];
+        BOOL recursive = [NSUserDefaults.standardUserDefaults boolForKey:HBRecursiveScan];
+        [self openURLs:fileURLs recursive:recursive];
     }
     [self.window.contentView setShowFocusRing:NO];
     return YES;
@@ -688,16 +689,14 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
     // Clear the undo manager, we can't undo this action
     [self.window.undoManager removeAllActions];
 
-    NSMutableArray<NSURL *> *mediaURLs = [[NSMutableArray alloc] init];
-
-    for (NSURL *fileURL in fileURLs)
-    {
-        [mediaURLs addObject:[HBUtilities mediaURLFromURL:fileURL]];
-    }
-
     // Check if we can scan the source and if there is any warning.
     NSError *outError = NULL;
-    BOOL canScan = [self.core canScan:mediaURLs error:&outError];
+    BOOL canScan = YES;
+
+    if (fileURLs.count == 1)
+    {
+        canScan = [self.core canScan:fileURLs error:&outError];
+    }
 
     // Notify the user that we don't support removal of copy protection.
     if (canScan && outError.code == 101 && !self.suppressCopyProtectionWarning)
@@ -721,7 +720,7 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
         NSUInteger hb_num_previews = [NSUserDefaults.standardUserDefaults integerForKey:HBPreviewsNumber];
         NSUInteger min_title_duration_seconds = [NSUserDefaults.standardUserDefaults integerForKey:HBMinTitleScanSeconds];
 
-        [self.core scanURLs:mediaURLs
+        [self.core scanURLs:fileURLs
                  titleIndex:index
                    previews:hb_num_previews minDuration:min_title_duration_seconds keepPreviews:YES
             progressHandler:^(HBState state, HBProgress progress, NSString *info)
@@ -749,16 +748,6 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
              {
                  // We display a message if a valid source was not chosen
                  self.sourceLabel.stringValue = NSLocalizedString(@"No Valid Source Found", @"Main Window -> Info text");
-             }
-
-             // Set the last searched source directory in the prefs here
-             if ([NSWorkspace.sharedWorkspace isFilePackageAtPath:mediaURLs.firstObject.URLByDeletingLastPathComponent.path])
-             {
-                 [NSUserDefaults.standardUserDefaults setURL:mediaURLs.firstObject.URLByDeletingLastPathComponent.URLByDeletingLastPathComponent forKey:HBLastSourceDirectoryURL];
-             }
-             else
-             {
-                 [NSUserDefaults.standardUserDefaults setURL:mediaURLs.firstObject.URLByDeletingLastPathComponent forKey:HBLastSourceDirectoryURL];
              }
 
              completionHandler(self.core.titles);
@@ -796,19 +785,24 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
      }];
 }
 
-- (void)askForPermissionAndSetDestinationURL:(NSURL *)destinationURL
+- (void)askForPermissionAndSetDestinationURLs:(NSArray<NSURL *> *)destinationURLs
 {
-    if (![self.destinationFolderURL isEqualTo:destinationURL])
+    if (destinationURLs.count == 0)
+    {
+        return;
+    }
+
+    if (![self.destinationFolderURL isEqualTo:destinationURLs.firstObject])
     {
 #ifdef __SANDBOX_ENABLED__
-            [self showOpenPanelForDestination:destinationURL];
+            [self showOpenPanelForDestination:destinationURLs.firstObject];
 #else
-            self.destinationFolderURL = destinationURL;
+            self.destinationFolderURL = destinationURLs.firstObject;
 #endif
     }
 }
 
-- (void)openURLs:(NSArray<NSURL *> *)fileURLs titleIndex:(NSUInteger)index
+- (void)openURLs:(NSArray<NSURL *> *)fileURLs recursive:(BOOL)recursive titleIndex:(NSUInteger)index
 {
     [self showWindow:self];
 
@@ -817,11 +811,14 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
     {
         [tokens addObject:[HBSecurityAccessToken tokenWithAlreadyAccessedObject:fileURL]];
     }
-
     self.fileTokens = tokens;
 
-    [self scanURLs:fileURLs titleIndex:index completionHandler:^(NSArray<HBTitle *> *titles)
+    NSArray<NSURL *> *expandedFileURLs = [HBUtilities expandURLs:fileURLs recursive:recursive];
+
+    [self scanURLs:expandedFileURLs titleIndex:index completionHandler:^(NSArray<HBTitle *> *titles)
     {
+        NSArray<NSURL *> *baseURLs = [HBUtilities baseURLs:expandedFileURLs];
+
         if (titles.count)
         {
             for (NSURL *fileURL in fileURLs)
@@ -844,7 +841,7 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
                 self.job = job;
                 if (featuredTitle.isStream && [NSUserDefaults.standardUserDefaults boolForKey:HBUseSourceFolderDestination])
                 {
-                    [self askForPermissionAndSetDestinationURL:job.fileURL.URLByDeletingLastPathComponent];
+                    [self askForPermissionAndSetDestinationURLs:baseURLs];
                 }
             }
             else
@@ -854,14 +851,17 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
                 self.sourceLabel.stringValue = NSLocalizedString(@"No Valid Preset", @"Main Window -> Info text");
             }
         }
+
+        // Set the last searched source directory in the prefs here
+        [NSUserDefaults.standardUserDefaults setURL:baseURLs.firstObject forKey:HBLastSourceDirectoryURL];
     }];
 }
 
-- (void)openURLs:(NSArray<NSURL *> *)fileURL
+- (void)openURLs:(NSArray<NSURL *> *)fileURLs recursive:(BOOL)recursive
 {
     if (self.core.state != HBStateScanning)
     {
-        [self openURLs:fileURL titleIndex:0];
+        [self openURLs:fileURLs recursive:recursive titleIndex:0];
     }
 }
 
@@ -911,7 +911,19 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
     HBJob *job = [[HBJob alloc] initWithTitle:title preset:self.currentPreset];
     if (job)
     {
-        job.destinationFolderURL = self.destinationFolderURL;
+        NSURL *destination = self.destinationFolderURL;
+
+        // If destination mode is set to same as source, try to set the source folder url
+        if (title.isStream && [NSUserDefaults.standardUserDefaults boolForKey:HBUseSourceFolderDestination])
+        {
+            NSURL *titleParentURL = title.url.URLByDeletingLastPathComponent;
+            if ([titleParentURL.path hasPrefix:self.destinationFolderURL.path])
+            {
+                destination = titleParentURL;
+            }
+        }
+
+        job.destinationFolderURL = destination;
 
         // If the source is not a stream, and autonaming is disabled,
         // keep the existing file name.
@@ -1053,8 +1065,9 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
     {
         if (result == NSModalResponseOK)
          {
+             BOOL recursive = [NSUserDefaults.standardUserDefaults boolForKey:HBRecursiveScan];
              NSInteger titleIdx = self.scanSpecificTitle ? self.scanSpecificTitleIdx : 0;
-             [self openURLs:panel.URLs titleIndex:titleIdx];
+             [self openURLs:panel.URLs recursive:recursive titleIndex:titleIdx];
          }
      }];
 }
