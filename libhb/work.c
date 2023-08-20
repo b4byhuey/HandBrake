@@ -1430,12 +1430,10 @@ static void sanitize_filter_list_pre(hb_job_t *job, hb_geometry_t src_geo)
     }
 
 #if HB_PROJECT_FEATURE_QSV && (defined( _WIN32 ) || defined( __MINGW32__ ))
-        // sanitize_qsv looks for subtitle render filter, so must happen after
-        // sanitize_subtitle
-        if (hb_qsv_is_enabled(job))
-        {
-            hb_qsv_sanitize_filter_list(job);
-        }
+    if (hb_qsv_is_enabled(job))
+    {
+        hb_qsv_sanitize_filter_list(job);
+    }
 #endif
 }
 
@@ -1448,7 +1446,7 @@ static void sanitize_filter_list_post(hb_job_t *job)
     }
 #endif
 
-    if (job->hw_pix_fmt == AV_PIX_FMT_NONE &&
+    if ((job->hw_pix_fmt == AV_PIX_FMT_NONE || job->hw_pix_fmt == AV_PIX_FMT_QSV) &&
         hb_video_encoder_pix_fmt_is_supported(job->vcodec, job->input_pix_fmt, job->encoder_profile) == 0)
     {
         // Some encoders require a specific input pixel format
@@ -1703,6 +1701,12 @@ static void do_job(hb_job_t *job)
         init.color_range = job->passthru_dynamic_hdr_metadata & DOVI &&
                             job->dovi.dv_profile == 5 ?
                             title->color_range : AVCOL_RANGE_MPEG;
+#if HB_PROJECT_FEATURE_QSV
+        if (hb_qsv_full_path_is_enabled(job))
+        {
+            init.color_range = (job->qsv.ctx->out_range == AVCOL_RANGE_UNSPECIFIED) ? title->color_range : job->qsv.ctx->out_range;
+        }
+#endif
         init.chroma_location = title->chroma_location;
         init.geometry = title->geometry;
         memset(init.crop, 0, sizeof(int[4]));
