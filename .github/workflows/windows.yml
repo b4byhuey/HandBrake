@@ -162,7 +162,7 @@ jobs:
         max-age: PT1M
         token: ${{ secrets.GITHUB_TOKEN }}
           
-    - uses: ncipollo/release-action@v1.12.0
+    - uses: ncipollo/release-action@v1.13.0
       with:
         artifacts: "win/*.*"
         name: "Snapshots for Windows"
