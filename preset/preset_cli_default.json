@@ -39,7 +39,7 @@
                     "FileFormat": "mp4",
                     "Folder": false,
                     "FolderOpen": false,
-                    "Mp4HttpOptimize": true,
+                    "Optimize": true,
                     "Mp4iPodCompatible": false,
                     "PictureCropMode": 0,
                     "PictureBottomCrop": 0,
