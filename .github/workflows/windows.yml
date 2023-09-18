@@ -32,7 +32,7 @@ jobs:
 
     - name: Setup Toolchain
       run: |
-        wgethttps://github.com/b4byhuey/mingw-w64-build/releases/download/Linux/mingw-w64-toolchain-9.4.0-linux-x86_64.tar.gz
+        wget https://github.com/b4byhuey/mingw-w64-build/releases/download/Linux/mingw-w64-toolchain-9.4.0-linux-x86_64.tar.gz
         SHA=$(sha1sum mingw-w64-toolchain-9.4.0-linux-x86_64.tar.gz)
         EXPECTED="ed25f95b079dd9b9442ed0661e49a77f55204279  mingw-w64-toolchain-9.4.0-linux-x86_64.tar.gz"
         if [ "$SHA" == "$EXPECTED" ];
