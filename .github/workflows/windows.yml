@@ -43,7 +43,6 @@ jobs:
             cd toolchains
             tar xvf mingw-w64-toolchain-9.4.0-linux-x86_64.tar.gz
             cd mingw-w64-toolchain-9.4.0-linux-x86_64/mingw-w64-x86_64/
-            pwd
         else
             echo "Toolchain Verification FAILED. Exiting!"
             return -1
@@ -56,8 +55,7 @@ jobs:
         
     - name: Build CLI and LibHB
       run: |
-        CWDIR=$(pwd)
-        export PATH="$CWDIR/HandBrake/toolchains/mingw-w64-toolchain-9.4.0-linux-x86_64/mingw-w64-x86_64/bin:${PATH}"
+        export PATH="/home/runner/work/HandBrake/HandBrake/toolchains/mingw-w64-toolchain-9.4.0-linux-x86_64/mingw-w64-x86_64/bin:${PATH}"
         export PATH=/usr/bin:$PATH
         git clone https://github.com/b4byhuey/HandBrake.git
         cd HandBrake
