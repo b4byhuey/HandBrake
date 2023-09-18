@@ -31,7 +31,7 @@ jobs:
       run: |
         wget https://github.com/b4byhuey/mingw-w64-build/releases/download/Linux/mingw-w64-toolchain-9.4.0-linux-x86_64.tar.gz
         SHA=$(sha1sum mingw-w64-toolchain-9.4.0-linux-x86_64.tar.gz)
-        EXPECTED="6ef7c3d5bada794d9ee84e9872fb01f23bb819fe  mingw-w64-toolchain-9.4.0-linux-x86_64.tar.gz"
+        EXPECTED="6f135f43ec8ec2f50b4c4813632efb77d964dd38  mingw-w64-toolchain-9.4.0-linux-x86_64.tar.gz"
         if [ "$SHA" == "$EXPECTED" ];
         then
             echo "Toolchain Verified. Extracting ..."
