@@ -60,13 +60,13 @@ jobs:
         make pkg.create.zip
 
     - name: Upload HandBrakeCLI
-      uses: actions/upload-artifact@v3.1.2
+      uses: actions/upload-artifact@v3.1.3
       with:
         name: HandBrakeCLI
         path: ./build/HandBrakeCLI.exe    
     
     - name: Upload LibHB
-      uses: actions/upload-artifact@v3.1.2
+      uses: actions/upload-artifact@v3.1.3
       with:
         name: LibHandBrake
         path: ./build/libhb/hb.dll
@@ -119,13 +119,13 @@ jobs:
       shell: cmd
     
     - name: Upload HandBrake exe Installer
-      uses: actions/upload-artifact@v3.1.2
+      uses: actions/upload-artifact@v3.1.3
       with:
         name: HandBrake-x86_64-Win_GUI-EXE
         path: win/CS/HandBrakeWPF/bin/HandBrake/HandBrake-Nightly-x86_64-Win_GUI.exe    
         
     - name: Upload HandBrake Portable
-      uses: actions/upload-artifact@v3.1.2
+      uses: actions/upload-artifact@v3.1.3
       with:
         name:  HandBrake-x86_64-Win_Portable
         path: win/CS/HandBrakeWPF/bin/HandBrake-Nightly-x86_64-Win_Portable.zip    
