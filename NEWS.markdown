@@ -120,6 +120,7 @@ Windows users, please make sure to install [Microsoft .NET Desktop Runtime versi
 - Queue, Activity and Presets windows no longer stay on top of the main window
 - Removed obsolete update checker
 - Miscellaneous bug fixes and improvements
+- Update existing translations
 
 ### Windows
 
@@ -147,6 +148,13 @@ Windows users, please make sure to install [Microsoft .NET Desktop Runtime versi
 - Fixed an issue where windows notifications could cause the app to crash on startup where issues exist on the system. (#5097)
 - Some reliability improvements in the Process Isolation Feature.
 - Miscellaneous bug fixes and improvements
+- Added new translations
+ - Czech (česky) (partially)
+ - Greek (Ελληνικά) (partially)
+ - Estonian (Eesti) (partially)
+ - Basque (Euskara)
+ - Finnish (Suomi) (partially)
+- Updated existing translations
 
 
 ## HandBrake 1.6.1
