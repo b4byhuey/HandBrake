@@ -156,7 +156,7 @@ jobs:
         path: win/    
         
     - name: Remove the old Release
-      uses: freenet-actions/delete-old-releases@v1
+      uses: freenet-actions/delete-old-releases@v2
       with:
         keep-latest-releases: false
         delete-tags: "windows"
