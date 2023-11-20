@@ -52,6 +52,8 @@ jobs:
     - name: Setup Cargo-C Toolchain
       if: steps.windows-cargo-c-toolchain.outputs.cache-hit != 'true'
       run: |
+        rustup update
+        cargo clean
         cargo install cargo-c
 
     - name: Build CLI and LibHB
