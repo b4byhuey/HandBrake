@@ -43,12 +43,7 @@ jobs:
         else
             echo "Toolchain Verification FAILED. Exiting!"
             return -1
-        fi
-        
-    - name: Setup Cargo-C Toolchain
-      if: steps.windows-cargo-c-toolchain.outputs.cache-hit != 'true'
-      run: |
-        cargo install cargo-c
+        fi          
         
     - name: Build CLI and LibHB
       run: |
