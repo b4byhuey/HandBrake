@@ -29,7 +29,7 @@ jobs:
         sudo apt-get install automake autoconf build-essential libtool libtool-bin make nasm patch tar yasm zlib1g-dev ninja-build gzip pax cmake libssl-dev
         sudo pip3 install meson
         rustup target add x86_64-pc-windows-gnu
-        cargo update
+        cargo install cargo --force
 
     - name: Setup Toolchain
       run: |
