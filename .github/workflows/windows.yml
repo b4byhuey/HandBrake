@@ -25,7 +25,6 @@ jobs:
         sudo apt-get install automake autoconf build-essential libtool libtool-bin make nasm patch tar yasm zlib1g-dev ninja-build gzip pax cmake libssl-dev
         sudo pip3 install meson
         rustup target add x86_64-pc-windows-gnu
-        echo "time=$(date +"%Y-%m-%d")" >> $GITHUB_ENV
 
     - name: Setup Toolchain
       run: |
@@ -49,7 +48,7 @@ jobs:
     - name: Setup Cargo-C Toolchain
       if: steps.windows-cargo-c-toolchain.outputs.cache-hit != 'true'
       run: |
-        cargo install cargo-c 
+        cargo install cargo-c
         
     - name: Build CLI and LibHB
       run: |
@@ -63,7 +62,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: HandBrakeCLI
-        path: ./build/HandBrakeCLI.exe    
+        path: ./build/HandBrakeCLI.exe
     
     - name: Upload LibHB
       uses: actions/upload-artifact@v3
@@ -102,7 +101,7 @@ jobs:
     - name: Build Windows GUI
       run: |
         $env:Path += ";C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin"
-        msbuild win\cs\build.xml /t:x64 /p:PfxFile=$env:SigningCertificate /p:PfxPwd=${{ secrets.HandBrakeTeam_pfx_pwd }} /p:SignTimestampServer=http://time.certum.pl/       
+        msbuild win\cs\build.xml /t:x64 /p:PfxFile=$env:SigningCertificate /p:PfxPwd=${{ secrets.HandBrakeTeam_pfx_pwd }} /p:SignTimestampServer=http://time.certum.pl/
 
     - name:  Prepare Package
       run: |
@@ -122,13 +121,13 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: HandBrake-x86_64-Win_GUI-EXE
-        path: win/CS/HandBrakeWPF/bin/HandBrake/HandBrake-Nightly-x86_64-Win_GUI.exe    
+        path: win/CS/HandBrakeWPF/bin/HandBrake/HandBrake-Nightly-x86_64-Win_GUI.exe
         
     - name: Upload HandBrake Portable
       uses: actions/upload-artifact@v3
       with:
         name:  HandBrake-x86_64-Win_Portable
-        path: win/CS/HandBrakeWPF/bin/HandBrake-Nightly-x86_64-Win_Portable.zip    
+        path: win/CS/HandBrakeWPF/bin/HandBrake-Nightly-x86_64-Win_Portable.zip
     
   deploy_nightly:
     name: Deploy Nightly Build
