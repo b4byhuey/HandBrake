@@ -29,7 +29,6 @@ jobs:
         sudo apt-get install automake autoconf build-essential curl git libtool libtool-bin make nasm patch pkg-config tar yasm zlib1g-dev ninja-build gzip pax cmake libssl-dev
         sudo pip3 install meson
         rustup target add x86_64-pc-windows-gnu
-        cargo install cargo --version 0.74.0 --force
 
     - name: Setup Toolchain
       run: |
@@ -59,7 +58,7 @@ jobs:
       run: |
         export PATH="/home/runner/work/HandBrake/HandBrake/toolchains/mingw-w64-toolchain-10.0.0-msvcrt-linux-x86_64/mingw-w64-x86_64/bin:${PATH}"
         export PATH=/usr/bin:$PATH
-        ./configure --cross=x86_64-w64-mingw32 --enable-qsv --enable-vce --enable-nvenc --enable-nvdec --enable-libdovi --launch-jobs=0 --launch
+        ./configure --cross=x86_64-w64-mingw32 --enable-qsv --enable-vce --enable-nvenc --enable-nvdec --enable-fdk-aac --launch-jobs=0 --launch
         cd build
         make pkg.create.zip
 
