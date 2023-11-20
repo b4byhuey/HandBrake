@@ -26,7 +26,7 @@ jobs:
     - name: Setup Environment
       run: |
         sudo apt-get purge cmake -y
-        sudo apt-get install automake autoconf build-essential intltool libtool libtool-bin make nasm patch tar yasm zlib1g-dev ninja-build gzip pax cmake
+        sudo apt-get install automake autoconf build-essential libtool libtool-bin make nasm patch tar yasm zlib1g-dev ninja-build gzip pax cmake libssl-dev
         sudo pip3 install meson
         rustup target add x86_64-pc-windows-gnu
 
@@ -56,11 +56,8 @@ jobs:
 
     - name: Build CLI and LibHB
       run: |
-        CWDIR=$(pwd)
-        export PATH="$CWDIR/toolchains/mingw-w64-toolchain-10.0.0-msvcrt-linux-x86_64/mingw-w64-x86_64/bin:${PATH}"
+        export PATH="/home/runner/work/HandBrake/HandBrake/toolchains/mingw-w64-toolchain-10.0.0-msvcrt-linux-x86_64/mingw-w64-x86_64/bin:${PATH}"
         export PATH=/usr/bin:$PATH
-        git clone https://github.com/HandBrake/HandBrake.git
-        cd HandBrake
         ./configure --cross=x86_64-w64-mingw32 --enable-qsv --enable-vce --enable-nvenc --enable-nvdec --enable-libdovi --launch-jobs=0 --launch
         cd build
         make pkg.create.zip
