@@ -11,17 +11,8 @@ jobs:
     name: CLI / LibHB
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v4
-
-    - name: Cargo-C Toolchain Cache
-      id: windows-cargo-c-toolchain
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/bin/cargo-capi
-          ~/.cargo/bin/cargo-cbuild
-          ~/.cargo/bin/cargo-cinstall
-        key: windows-cargo-c-toolchain
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v3
 
     - name: Setup Environment
       run: |
@@ -47,12 +38,7 @@ jobs:
         else
             echo "Toolchain Verification FAILED. Exiting!"
             return -1
-        fi
-
-    - name: Setup Cargo-C Toolchain
-      if: steps.windows-cargo-c-toolchain.outputs.cache-hit != 'true'
-      run: |        
-        cargo install cargo-c
+        fi   
 
     - name: Build CLI and LibHB
       run: |
