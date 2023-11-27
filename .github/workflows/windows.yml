@@ -11,7 +11,7 @@ jobs:
     name: CLI / LibHB
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Cargo-C Toolchain Cache
       id: windows-cargo-c-toolchain
@@ -138,7 +138,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_mingw, build_gui]
     steps:
-    - uses: actions/checkout@v4.1.1
+    - uses: actions/checkout@v4
        
     - name: Download Artifacts - CLI
       uses: actions/download-artifact@v3.0.2
