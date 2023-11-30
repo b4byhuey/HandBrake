@@ -28,6 +28,14 @@ hb_metal_context_t * hb_metal_context_init(const char *metallib_data,
 
     NSArray<id<MTLDevice>> *devices = MTLCopyAllDevices();
     ctx->device = [devices.lastObject retain];
+    for (id<MTLDevice> device in devices)
+    {
+        if (device.isLowPower)
+        {
+            [ctx->device release];
+            ctx->device = [device retain];
+        }
+    }
     [devices release];
     if (!ctx->device)
     {
@@ -57,12 +65,15 @@ hb_metal_context_t * hb_metal_context_init(const char *metallib_data,
         goto fail;
     }
 
-    ctx->params_buffer = [ctx->device newBufferWithLength:params_buffer_len
-                                                  options:MTLResourceStorageModeShared];
-    if (!ctx->params_buffer)
+    if (params_buffer_len)
     {
-        hb_error("metal: failed to create Metal buffer for parameters");
-        goto fail;
+        ctx->params_buffer = [ctx->device newBufferWithLength:params_buffer_len
+                                                      options:MTLResourceStorageModeShared];
+        if (!ctx->params_buffer)
+        {
+            hb_error("metal: failed to create Metal buffer for parameters");
+            goto fail;
+        }
     }
 
     ctx->queue = ctx->device.newCommandQueue;
@@ -72,10 +83,13 @@ hb_metal_context_t * hb_metal_context_init(const char *metallib_data,
         goto fail;
     }
 
-    if (hb_metal_add_pipeline(ctx, function_name, 0))
+    if (function_name != NULL)
     {
-        hb_error("metal: failed to add Metal function");
-        goto fail;
+        if (hb_metal_add_pipeline(ctx, function_name, 0))
+        {
+            hb_error("metal: failed to add Metal function");
+            goto fail;
+        }
     }
 
     CVReturn ret = CVMetalTextureCacheCreate(NULL, NULL, ctx->device, NULL, &ctx->cache);
@@ -135,6 +149,9 @@ void hb_metal_context_close(hb_metal_context_t **_ctx)
             [ctx->functions[i] release];
             [ctx->pipelines[i] release];
         }
+        av_free(ctx->functions);
+        av_free(ctx->pipelines);
+
         [ctx->params_buffer release];
         [ctx->queue release];
         [ctx->library release];
