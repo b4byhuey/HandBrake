@@ -47,30 +47,17 @@ jobs:
         else
             echo "Toolchain Verification FAILED. Exiting!"
             return -1
-<<<<<<< HEAD
         fi
-=======
-        fi   
->>>>>>> f7be443cda12d81cf323e8eb22f2ea8e0efbe55d
 
     - name: Setup Cargo-C Toolchain
       if: steps.windows-cargo-c-toolchain.outputs.cache-hit != 'true'
       run: |
         cargo install cargo-c
-<<<<<<< HEAD
-
-=======
-    
->>>>>>> f7be443cda12d81cf323e8eb22f2ea8e0efbe55d
     - name: Build CLI and LibHB
       run: |
         export PATH="/home/runner/work/HandBrake/HandBrake/toolchains/mingw-w64-toolchain-10.0.0-msvcrt-linux-x86_64/mingw-w64-x86_64/bin:${PATH}"
         export PATH=/usr/bin:$PATH
-<<<<<<< HEAD
-        ./configure --cross=x86_64-w64-mingw32 --enable-qsv --enable-vce --enable-nvenc --enable-nvdec --launch-jobs=0 --launch
-=======
         ./configure --cross=x86_64-w64-mingw32 --enable-qsv --enable-vce --enable-nvenc --enable-nvdec --enable-libdovi --enable-fdk-aac --launch-jobs=0 --launch
->>>>>>> f7be443cda12d81cf323e8eb22f2ea8e0efbe55d
         cd build
         make pkg.create.zip
 
@@ -123,7 +110,6 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: HandBrake-x86_64-Win_GUI-EXE
-<<<<<<< HEAD
         path: win/CS/HandBrakeWPF/bin/publish/HandBrake-Nightly-x86_64-Win_GUI.exe
 
     - name: Upload HandBrake msi Installer
@@ -131,8 +117,6 @@ jobs:
       with:
         name:  HandBrake-x86_64-Win_GUI-MSI
         path: win/CS/HandBrakeWPF/bin/publish/HandBrake-Nightly-x86_64-Win_GUI.msi
-=======
-        path: win/CS/HandBrakeWPF/bin/HandBrake/HandBrake-Nightly-x86_64-Win_GUI.exe
         
     - name: Upload HandBrake Portable
       uses: actions/upload-artifact@v3
@@ -182,4 +166,3 @@ jobs:
         allowUpdates: false
         tag: $time_snap
         token: ${{ secrets.GITHUB_TOKEN }}
->>>>>>> f7be443cda12d81cf323e8eb22f2ea8e0efbe55d
