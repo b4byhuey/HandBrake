@@ -1,6 +1,6 @@
 /* common.h
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2023 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -1210,6 +1210,7 @@ struct hb_title_s
     uint32_t        video_stream_type;      /* stream type from source stream */
     int             video_codec_param;      /* codec specific config */
     char          * video_codec_name;
+    int             video_codec_profile;
     int             video_bitrate;
     hb_rational_t   video_timebase;
     char          * container_name;
@@ -1478,6 +1479,20 @@ struct hb_filter_object_s
 #endif
 };
 
+struct hb_motion_metric_object_s
+{
+    char                * name;
+
+#ifdef __LIBHB__
+    int                (* init)       ( hb_motion_metric_object_t *, hb_filter_init_t * );
+    float              (* work)       ( hb_motion_metric_object_t *,
+                                        hb_buffer_t *, hb_buffer_t * );
+    void               (* close)      ( hb_motion_metric_object_t * );
+
+    hb_motion_metric_private_t * private_data;
+#endif
+};
+
 // Update win/CS/HandBrake.Interop/HandBrakeInterop/HbLib/hb_filter_ids.cs when changing this enum
 enum
 {
@@ -1488,9 +1503,12 @@ enum
     // First, filters that may change the framerate (drop or dup frames)
     HB_FILTER_DETELECINE,
     HB_FILTER_COMB_DETECT,
+    HB_FILTER_COMB_DETECT_VT,
     HB_FILTER_DECOMB,
     HB_FILTER_YADIF,
+    HB_FILTER_YADIF_VT,
     HB_FILTER_BWDIF,
+    HB_FILTER_BWDIF_VT,
     HB_FILTER_VFR,
     // Filters that must operate on the original source image are next
     HB_FILTER_DEBLOCK,
@@ -1498,15 +1516,20 @@ enum
     HB_FILTER_HQDN3D = HB_FILTER_DENOISE,
     HB_FILTER_NLMEANS,
     HB_FILTER_CHROMA_SMOOTH,
+    HB_FILTER_CHROMA_SMOOTH_VT,
     HB_FILTER_ROTATE,
     HB_FILTER_ROTATE_VT,
     HB_FILTER_RENDER_SUB,
     HB_FILTER_CROP_SCALE,
     HB_FILTER_CROP_SCALE_VT,
     HB_FILTER_LAPSHARP,
+    HB_FILTER_LAPSHARP_VT,
     HB_FILTER_UNSHARP,
+    HB_FILTER_UNSHARP_VT,
     HB_FILTER_GRAYSCALE,
+    HB_FILTER_GRAYSCALE_VT,
     HB_FILTER_PAD,
+    HB_FILTER_PAD_VT,
     HB_FILTER_COLORSPACE,
     HB_FILTER_FORMAT,
     HB_FILTER_RPU,
@@ -1557,6 +1580,7 @@ char ** hb_str_vsplit( const char * str, char delem );
 int hb_yuv2rgb(int yuv);
 int hb_rgb2yuv(int rgb);
 int hb_rgb2yuv_bt709(int rgb);
+int hb_rgb2yuv_bt2020(int rgb);
 
 const char * hb_subsource_name( int source );
 

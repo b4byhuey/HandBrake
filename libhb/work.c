@@ -1,6 +1,6 @@
 /* work.c
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2023 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -443,11 +443,6 @@ void hb_display_job_info(hb_job_t *job)
             if (job->ipod_atom)
                 hb_log("     + compatibility atom for iPod 5G");
             break;
-        case HB_MUX_AV_MKV:
-        case HB_MUX_AV_WEBM:
-            if (job->optimize)
-                hb_log("     + optimized for HTTP streaming (cues to the front)");
-            break;
         default:
             break;
     }
@@ -476,8 +471,8 @@ void hb_display_job_info(hb_job_t *job)
 #endif
     if (hb_hwaccel_decode_is_enabled(job))
     {
-        hb_log("   + decoder: %s %d-bit (%s, %s)",
-               hb_hwaccel_get_codec_name(title->video_codec_param), hb_get_bit_depth(job->input_pix_fmt), av_get_pix_fmt_name(job->input_pix_fmt), av_get_pix_fmt_name(job->hw_pix_fmt));
+        hb_log("   + decoder: %s %d-bit hwaccel (%s, %s)",
+               title->video_codec_name, hb_get_bit_depth(job->input_pix_fmt), av_get_pix_fmt_name(job->input_pix_fmt), av_get_pix_fmt_name(job->hw_pix_fmt));
     }
     else
     {
@@ -1488,13 +1483,13 @@ static void sanitize_filter_list_post(hb_job_t *job)
     }
 }
 
-static int dolby_vision_level(int width, int height, hb_rational_t vrate)
+static int dolby_vision_level(int width, int pps, int bitrate)
 {
-    int pps = (double)width * height * (vrate.num / vrate.den);
-
     for (int i = 0; hb_dolby_vision_levels[i].id != 0; i++)
     {
-        if (pps < hb_dolby_vision_levels[i].max_pps)
+        if (pps <= hb_dolby_vision_levels[i].max_pps &&
+            width <= hb_dolby_vision_levels[i].max_width &&
+            bitrate <= (int)hb_dolby_vision_levels[i].max_bitrate_main_tier * 1024)
         {
             return hb_dolby_vision_levels[i].id;
         }
@@ -1506,7 +1501,14 @@ static int dolby_vision_level(int width, int height, hb_rational_t vrate)
 
 static void update_dolby_vision_level(hb_job_t *job)
 {
-    job->dovi.dv_level = dolby_vision_level(job->width, job->height, job->vrate);
+    // Dolby Vision has got its own definition of "level"
+    // defined in section 2.2 of "Dolby Vision Profiles and Levels"
+    // moreover, x265 requires vbv to be set, so do a rough guess here.
+    // Encoders can override it when needed.
+    int pps = (double)job->width * job->height * (job->vrate.num / job->vrate.den);
+    int bitrate = job->vquality == HB_INVALID_VIDEO_QUALITY ? job->vbitrate : -1;
+
+    job->dovi.dv_level = dolby_vision_level(job->width, pps, bitrate);
 }
 
 static void sanitize_dynamic_hdr_metadata_passthru(hb_job_t *job)

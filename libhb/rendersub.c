@@ -1,6 +1,6 @@
 /* rendersub.c
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2023 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -1252,6 +1252,7 @@ static int hb_rendersub_init( hb_filter_object_t * filter,
             break;
         case AV_PIX_FMT_NV16:
         case AV_PIX_FMT_P210:
+        case AV_PIX_FMT_P212:
         case AV_PIX_FMT_P216:
         case AV_PIX_FMT_YUV422P:
         case AV_PIX_FMT_YUV422P10:
@@ -1261,6 +1262,7 @@ static int hb_rendersub_init( hb_filter_object_t * filter,
             break;
         case AV_PIX_FMT_NV24:
         case AV_PIX_FMT_P410:
+        case AV_PIX_FMT_P412:
         case AV_PIX_FMT_P416:
         case AV_PIX_FMT_YUV444P:
         case AV_PIX_FMT_YUV444P10:

@@ -1,6 +1,6 @@
 /* common.c
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2023 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -274,7 +274,7 @@ hb_encoder_internal_t hb_video_encoders[]  =
     { { "AV1 10-bit (Intel QSV)",      "qsv_av1_10bit",    "AV1 10-bit (Intel Media SDK)",   HB_VCODEC_QSV_AV1_10BIT,     HB_MUX_MASK_MP4|HB_MUX_MASK_WEBM|HB_MUX_MASK_MKV, }, NULL, 0, 1, HB_GID_VCODEC_AV1_QSV,    },
     { { "AV1 (NVEnc)",                 "nvenc_av1",        "AV1 (NVEnc)",                    HB_VCODEC_FFMPEG_NVENC_AV1,                   HB_MUX_MASK_MP4|HB_MUX_MASK_MKV, }, NULL, 0, 1, HB_GID_VCODEC_AV1_NVENC,  },
     { { "AV1 10-bit (NVEnc)",          "nvenc_av1_10bit",  "AV1 10-bit (NVEnc)",             HB_VCODEC_FFMPEG_NVENC_AV1_10BIT,             HB_MUX_MASK_MP4|HB_MUX_MASK_MKV, }, NULL, 0, 1, HB_GID_VCODEC_AV1_NVENC,  },
-    { { "AV1 (AMD VCE)",               "vce_av1",          "AV1 (AMD VCE)",                  HB_VCODEC_FFMPEG_VCE_AV1,    				   HB_MUX_MASK_MP4|HB_MUX_MASK_MKV, }, NULL, 0, 1, HB_GID_VCODEC_AV1_VCE,   },
+    { { "AV1 (AMD VCE)",               "vce_av1",          "AV1 (AMD VCE)",                  HB_VCODEC_FFMPEG_VCE_AV1,    				   HB_MUX_MASK_MP4|HB_MUX_MASK_MKV, }, NULL, 0, 1, HB_GID_VCODEC_AV1_VCE,    },
     { { "H.264 (x264)",                "x264",             "H.264 (libx264)",                HB_VCODEC_X264_8BIT,                          HB_MUX_MASK_MP4|HB_MUX_MASK_MKV, }, NULL, 0, 1, HB_GID_VCODEC_H264_X264,  },
     { { "H.264 10-bit (x264)",         "x264_10bit",       "H.264 10-bit (libx264)",         HB_VCODEC_X264_10BIT,                         HB_MUX_MASK_MP4|HB_MUX_MASK_MKV, }, NULL, 0, 1, HB_GID_VCODEC_H264_X264,  },
     { { "H.264 (Intel QSV)",           "qsv_h264",         "H.264 (Intel Media SDK)",        HB_VCODEC_QSV_H264,                           HB_MUX_MASK_MP4|HB_MUX_MASK_MKV, }, NULL, 0, 1, HB_GID_VCODEC_H264_QSV,   },
@@ -530,11 +530,30 @@ int hb_str_ends_with(const char *base, const char *str)
     return (blen >= slen) && (0 == strcasecmp(base + blen - slen, str));
 }
 
+static void hb_common_global_hw_init()
+{
+#if HB_PROJECT_FEATURE_NVENC
+    hb_nvenc_h264_available();
+#endif
+#if HB_PROJECT_FEATURE_VCE
+    hb_vce_h264_available();
+#endif
+    // first initialization and QSV adapters list collection should happen after other hw vendors initializations to prevent device order issues
+#if HB_PROJECT_FEATURE_QSV
+    hb_qsv_available();
+#endif
+}
+
 void hb_common_global_init(int disable_hardware)
 {
     static int common_init_done = 0;
     if (common_init_done)
         return;
+
+    if (!disable_hardware)
+    {
+        hb_common_global_hw_init();
+    }
 
     int i, j;
 
@@ -4673,12 +4692,44 @@ hb_filter_object_t * hb_filter_get( int filter_id )
             filter = &hb_filter_prefilter_vt;
             break;
 
+        case HB_FILTER_COMB_DETECT_VT:
+            filter = &hb_filter_comb_detect_vt;
+            break;
+
+        case HB_FILTER_YADIF_VT:
+            filter = &hb_filter_yadif_vt;
+            break;
+
+        case HB_FILTER_BWDIF_VT:
+            filter = &hb_filter_bwdif_vt;
+            break;
+
+        case HB_FILTER_CHROMA_SMOOTH_VT:
+            filter = &hb_filter_chroma_smooth_vt;
+            break;
+
         case HB_FILTER_CROP_SCALE_VT:
             filter = &hb_filter_crop_scale_vt;
             break;
 
+        case HB_FILTER_PAD_VT:
+            filter = &hb_filter_pad_vt;
+            break;
+
         case HB_FILTER_ROTATE_VT:
             filter = &hb_filter_rotate_vt;
+            break;
+
+        case HB_FILTER_GRAYSCALE_VT:
+            filter = &hb_filter_grayscale_vt;
+            break;
+
+        case HB_FILTER_LAPSHARP_VT:
+            filter = &hb_filter_lapsharp_vt;
+            break;
+
+        case HB_FILTER_UNSHARP_VT:
+            filter = &hb_filter_unsharp_vt;
             break;
 #endif
 
@@ -6018,6 +6069,30 @@ int hb_rgb2yuv_bt709(int rgb)
     return (y << 16) | (Cr << 8) | Cb;
 }
 
+int hb_rgb2yuv_bt2020(int rgb)
+{
+    double r, g, b;
+    int y, Cr, Cb;
+
+    r = (rgb >> 16) & 0xff;
+    g = (rgb >>  8) & 0xff;
+    b = (rgb      ) & 0xff;
+
+    y  =  16. + ( 0.2307 * r) + (0.5956 * g) + (0.0521 * b);
+    Cb = 128. + (-0.1227 * r) - (0.3166 * g) + (0.4392 * b);
+    Cr = 128. + ( 0.4392 * r) - (0.4039 * g) - (0.0353 * b);
+
+    y = (y < 0) ? 0 : y;
+    Cb = (Cb < 0) ? 0 : Cb;
+    Cr = (Cr < 0) ? 0 : Cr;
+
+    y = (y > 255) ? 255 : y;
+    Cb = (Cb > 255) ? 255 : Cb;
+    Cr = (Cr > 255) ? 255 : Cr;
+
+    return (y << 16) | (Cr << 8) | Cb;
+}
+
 const char * hb_subsource_name( int source )
 {
     switch (source)
@@ -6351,7 +6426,8 @@ static int pix_fmt_is_supported(hb_job_t *job, int pix_fmt)
             case HB_FILTER_LAPSHARP:
             case HB_FILTER_UNSHARP:
             case HB_FILTER_GRAYSCALE:
-               if (planes_count == 2)
+               if (planes_count == 2 &&
+                   job->hw_pix_fmt != AV_PIX_FMT_VIDEOTOOLBOX)
                {
                    return 0;
                }
@@ -6363,13 +6439,14 @@ static int pix_fmt_is_supported(hb_job_t *job, int pix_fmt)
 
 static const enum AVPixelFormat pipeline_pix_fmts[] =
 {
-    AV_PIX_FMT_YUV444P12,
+    AV_PIX_FMT_P416, AV_PIX_FMT_YUV444P16,
+    AV_PIX_FMT_P412, AV_PIX_FMT_YUV444P12,
     AV_PIX_FMT_P410, AV_PIX_FMT_YUV444P10,
     AV_PIX_FMT_NV24, AV_PIX_FMT_YUV444P,
-    AV_PIX_FMT_YUV422P12,
+    AV_PIX_FMT_P212, AV_PIX_FMT_YUV422P12,
     AV_PIX_FMT_P210, AV_PIX_FMT_YUV422P10,
     AV_PIX_FMT_NV16, AV_PIX_FMT_YUV422P,
-    AV_PIX_FMT_YUV420P12,
+    AV_PIX_FMT_P012, AV_PIX_FMT_YUV420P12,
     AV_PIX_FMT_P010, AV_PIX_FMT_YUV420P10,
     AV_PIX_FMT_NV12, AV_PIX_FMT_YUV420P,
     AV_PIX_FMT_NONE

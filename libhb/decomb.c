@@ -1,6 +1,6 @@
 /* decomb.c
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2023 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -440,6 +440,8 @@ static void hb_decomb_close(hb_filter_object_t *filter)
     {
         taskset_fini(&pv->eedi2_taskset);
     }
+
+    hb_buffer_list_close(&pv->out_list);
 
     // Cleanup reference buffers
     for (int ii = 0; ii < 3; ii++)

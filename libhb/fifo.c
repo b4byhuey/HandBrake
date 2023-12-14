@@ -1,6 +1,6 @@
 /* fifo.c
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2023 HandBrake Team
    Copyright 2022 NVIDIA Corporation
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
@@ -493,15 +493,19 @@ void hb_buffer_realloc( hb_buffer_t * b, int size )
 
 void hb_buffer_reduce( hb_buffer_t * b, int size )
 {
-
     if (b->storage_type == STANDARD && (size < b->alloc / 8 || b->data == NULL))
     {
-        hb_buffer_t * tmp = hb_buffer_init( size );
-
-        hb_buffer_swap_copy( b, tmp );
-        memcpy( b->data, tmp->data, size );
-        tmp->next = NULL;
-        hb_buffer_close( &tmp );
+        hb_buffer_t *tmp = hb_buffer_init(size);
+        if (tmp)
+        {
+            hb_buffer_swap_copy(b, tmp);
+            if (tmp->data)
+            {
+                memcpy(b->data, tmp->data, size);
+            }
+            tmp->next = NULL;
+        }
+        hb_buffer_close(&tmp);
     }
 }
 
@@ -509,39 +513,51 @@ AVFrameSideData *hb_buffer_new_side_data_from_buf(hb_buffer_t *buf,
                                                   enum AVFrameSideDataType type,
                                                   AVBufferRef *side_data_buf)
 {
-    AVFrameSideData *ret, **tmp;
-
-    if (!buf)
+    AVFrameSideData *ret;
+    if (buf->storage_type == AVFRAME)
     {
-        return NULL;
+        AVFrame *frame = (AVFrame *)buf->storage;
+        ret = av_frame_new_side_data_from_buf(frame, type, side_data_buf);
+        buf->side_data = (void **)frame->side_data;
+        buf->nb_side_data = frame->nb_side_data;
+        return ret;
     }
-
-    if (buf->nb_side_data > INT_MAX / sizeof(*buf->side_data) - 1)
+    else
     {
-        return NULL;
+        AVFrameSideData **tmp;
+
+        if (!buf)
+        {
+            return NULL;
+        }
+
+        if (buf->nb_side_data > INT_MAX / sizeof(*buf->side_data) - 1)
+        {
+            return NULL;
+        }
+
+        tmp = av_realloc(buf->side_data, (buf->nb_side_data + 1) * sizeof(*buf->side_data));
+        if (!tmp)
+        {
+            return NULL;
+        }
+        buf->side_data = (void **)tmp;
+
+        ret = av_mallocz(sizeof(*ret));
+        if (!ret)
+        {
+            return NULL;
+        }
+
+        ret->buf = side_data_buf;
+        ret->data = ret->buf->data;
+        ret->size = side_data_buf->size;
+        ret->type = type;
+
+        buf->side_data[buf->nb_side_data++] = ret;
+
+        return ret;
     }
-
-    tmp = av_realloc(buf->side_data, (buf->nb_side_data + 1) * sizeof(*buf->side_data));
-    if (!tmp)
-    {
-        return NULL;
-    }
-    buf->side_data = (void **)tmp;
-
-    ret = av_mallocz(sizeof(*ret));
-    if (!ret)
-    {
-        return NULL;
-    }
-
-    ret->buf = side_data_buf;
-    ret->data = ret->buf->data;
-    ret->size = side_data_buf->size;
-    ret->type = type;
-
-    buf->side_data[buf->nb_side_data++] = ret;
-
-    return ret;
 }
 
 static void free_side_data(AVFrameSideData **ptr_sd)
@@ -553,16 +569,25 @@ static void free_side_data(AVFrameSideData **ptr_sd)
     av_freep(ptr_sd);
 }
 
-void hb_frame_remove_side_data(hb_buffer_t *buf, enum AVFrameSideDataType type)
+void hb_buffer_remove_side_data(hb_buffer_t *buf, enum AVFrameSideDataType type)
 {
-    for (int i = buf->nb_side_data - 1; i >= 0; i--)
+    if (buf->storage_type == AVFRAME)
     {
-        AVFrameSideData *sd = buf->side_data[i];
-        if (sd->type == type)
+        AVFrame *frame = (AVFrame *)buf->storage;
+        av_frame_remove_side_data(frame, type);
+        buf->nb_side_data = frame->nb_side_data;
+    }
+    else
+    {
+        for (int i = buf->nb_side_data - 1; i >= 0; i--)
         {
-            free_side_data((AVFrameSideData **)&buf->side_data[i]);
-            buf->side_data[i] = buf->side_data[buf->nb_side_data - 1];
-            buf->nb_side_data--;
+            AVFrameSideData *sd = buf->side_data[i];
+            if (sd->type == type)
+            {
+                free_side_data((AVFrameSideData **)&buf->side_data[i]);
+                buf->side_data[i] = buf->side_data[buf->nb_side_data - 1];
+                buf->nb_side_data--;
+            }
         }
     }
 }
@@ -636,15 +661,15 @@ static void copy_avframe_to_video_buffer(const AVFrame *frame, hb_buffer_t *buf)
         }
         else
         {
-            const int width     = buf->plane[pp].width;
-            const int height    = buf->plane[pp].height;
             const int stride    = buf->plane[pp].stride;
+            const int height    = buf->plane[pp].height;
             const int linesize  = frame->linesize[pp];
+            const int size = linesize < stride ? ABS(linesize) : stride;
             uint8_t *dst = buf->plane[pp].data;
             uint8_t *src = frame->data[pp];
             for (int yy = 0; yy < height; yy++)
             {
-                memcpy(dst, src, width);
+                memcpy(dst, src, size);
                 dst += stride;
                 src += linesize;
             }
@@ -685,12 +710,21 @@ hb_buffer_t * hb_buffer_dup(const hb_buffer_t *src)
         // into another hardware AVFrame.
         if (frame->hw_frames_ctx)
         {
-            buf = hb_buffer_wrapper_init();
-            if (buf)
+#ifdef __APPLE__
+            if (frame->format == AV_PIX_FMT_VIDEOTOOLBOX)
             {
-                buf->f = src->f;
-                hb_buffer_copy_props(buf, src);
-                copy_hwframe_to_video_buffer(frame, buf);
+                buf = hb_vt_buffer_dup(src);
+            }
+            else
+#endif
+            {
+                buf = hb_buffer_wrapper_init();
+                if (buf)
+                {
+                    buf->f = src->f;
+                    hb_buffer_copy_props(buf, src);
+                    copy_hwframe_to_video_buffer(frame, buf);
+                }
             }
         }
         // If not, copy the content to a standard hb_buffer

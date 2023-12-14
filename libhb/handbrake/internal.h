@@ -1,6 +1,6 @@
 /* internal.h
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2023 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -202,11 +202,11 @@ int           hb_picture_crop(uint8_t *data[], int stride[], hb_buffer_t *b,
 AVFrameSideData *hb_buffer_new_side_data_from_buf(hb_buffer_t *buf,
                                                   enum AVFrameSideDataType type,
                                                   AVBufferRef *side_data_buf);
-void hb_frame_remove_side_data(hb_buffer_t *buf, enum AVFrameSideDataType type);
-void             hb_buffer_wipe_side_data(hb_buffer_t *buf);
-void             hb_buffer_copy_side_data(hb_buffer_t *dst, const hb_buffer_t *src);
+void          hb_buffer_remove_side_data(hb_buffer_t *buf, enum AVFrameSideDataType type);
+void          hb_buffer_wipe_side_data(hb_buffer_t *buf);
+void          hb_buffer_copy_side_data(hb_buffer_t *dst, const hb_buffer_t *src);
 
-void             hb_buffer_copy_props(hb_buffer_t *dst, const hb_buffer_t *src);
+void          hb_buffer_copy_props(hb_buffer_t *dst, const hb_buffer_t *src);
 
 hb_fifo_t   * hb_fifo_init( int capacity, int thresh );
 void          hb_fifo_register_full_cond( hb_fifo_t * f, hb_cond_t * c );
@@ -496,8 +496,22 @@ extern hb_filter_object_t hb_filter_format;
 
 #if defined(__APPLE__)
 extern hb_filter_object_t hb_filter_prefilter_vt;
+extern hb_filter_object_t hb_filter_comb_detect_vt;
+extern hb_filter_object_t hb_filter_yadif_vt;
+extern hb_filter_object_t hb_filter_bwdif_vt;
 extern hb_filter_object_t hb_filter_crop_scale_vt;
+extern hb_filter_object_t hb_filter_chroma_smooth_vt;
 extern hb_filter_object_t hb_filter_rotate_vt;
+extern hb_filter_object_t hb_filter_grayscale_vt;
+extern hb_filter_object_t hb_filter_pad_vt;
+extern hb_filter_object_t hb_filter_lapsharp_vt;
+extern hb_filter_object_t hb_filter_unsharp_vt;
+#endif
+
+extern hb_motion_metric_object_t hb_motion_metric;
+
+#if defined(__APPLE__)
+extern hb_motion_metric_object_t hb_motion_metric_vt;
 #endif
 
 extern hb_work_object_t * hb_objects;

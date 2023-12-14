@@ -1,6 +1,6 @@
 /* muxcommon.c
 
-   Copyright (c) 2003-2022 HandBrake Team
+   Copyright (c) 2003-2023 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -563,12 +563,9 @@ static void muxClose( hb_work_object_t * muxer )
         {
             hb_buffer_close( &b );
         }
-        if( track->mux_data )
-        {
-            free( track->mux_data );
-            free( track->mf.fifo );
-        }
-        free( track );
+        free(track->mux_data);
+        free(track->mf.fifo);
+        free(track);
     }
     free(mux->track);
     hb_unlock( mux->mutex );

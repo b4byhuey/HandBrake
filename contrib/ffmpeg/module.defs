@@ -12,9 +12,9 @@ endif
 $(eval $(call import.MODULE.defs,FFMPEG,ffmpeg,$(__deps__)))
 $(eval $(call import.CONTRIB.defs,FFMPEG))
 
-FFMPEG.FETCH.url    = https://github.com/HandBrake/HandBrake-contribs/releases/download/contribs/ffmpeg-snapshot-20230909.tar.gz
-#FFMPEG.FETCH.url   += https://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2
-FFMPEG.FETCH.sha256 = 47fd6838af1b840ffb1e6a151c45b8085b592b5acf1ff4749b8a16a29c834c4f
+FFMPEG.FETCH.url    = https://github.com/HandBrake/HandBrake-contribs/releases/download/contribs/ffmpeg-6.1.tar.bz2
+FFMPEG.FETCH.url   += https://ffmpeg.org/releases/ffmpeg-6.1.tar.bz2
+FFMPEG.FETCH.sha256 = eb7da3de7dd3ce48a9946ab447a7346bd11a3a85e6efb8f2c2ce637e7f547611
 
 FFMPEG.CONFIGURE.deps  =
 FFMPEG.CONFIGURE.host  =
@@ -118,7 +118,7 @@ ifeq (darwin,$(HOST.system))
     ifeq (x86_64,$(HOST.arch))
         FFMPEG.CONFIGURE.extra += --arch=x86_64
     else ifeq (arm64,$(HOST.arch))
-        FFMPEG.CONFIGURE.extra += --arch=arm64
+        FFMPEG.CONFIGURE.extra += --arch=arm64 --enable-hwaccel=vp9_videotoolbox
     endif
 
     ifeq (1,$(HOST.cross))
