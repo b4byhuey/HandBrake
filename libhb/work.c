@@ -1,6 +1,6 @@
 /* work.c
 
-   Copyright (c) 2003-2023 HandBrake Team
+   Copyright (c) 2003-2024 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -398,14 +398,14 @@ void hb_display_job_info(hb_job_t *job)
 
         if (job->pts_to_stop)
         {
-            hb_log("   + title %d, start %02d:%02d:%02.2f stop %02d:%02d:%02.2f",
+            hb_log("   + title %d, start %02d:%02d:%05.2f stop %02d:%02d:%05.2f",
                    title->index,
                    hr_start, min_start, sec_start,
                    hr_stop,  min_stop,  sec_stop);
         }
         else
         {
-            hb_log("   + title %d, start %02d:%02d:%02.2f",
+            hb_log("   + title %d, start %02d:%02d:%05.2f",
                    title->index,
                    hr_start, min_start, sec_start);
         }
