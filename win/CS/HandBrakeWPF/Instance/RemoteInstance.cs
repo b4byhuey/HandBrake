@@ -93,18 +93,7 @@ namespace HandBrakeWPF.Instance
 
         public JsonState GetProgress()
         {
-            Task<ServerResponse> response = this.MakeHttpGetRequest("PollEncodeProgress");
-            response.Wait();
-
-            if (!response.Result.WasSuccessful)
-            {
-                return null;
-            }
-
-            string statusJson = response.Result?.JsonResponse;
-
-            JsonState state = JsonSerializer.Deserialize<JsonState>(statusJson, JsonSettings.Options);
-            return state;
+            throw new NotImplementedException("Not Used");
         }
 
         private void MonitorEncodeProgress()
@@ -219,6 +208,8 @@ namespace HandBrakeWPF.Instance
 
             if (string.IsNullOrEmpty(statusJson))
             {
+                retryCount = this.retryCount + 1;
+                this.encodePollTimer?.Start(); // Reset and try again.
                 return;
             }
 

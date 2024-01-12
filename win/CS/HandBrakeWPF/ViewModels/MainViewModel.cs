@@ -1037,7 +1037,7 @@ namespace HandBrakeWPF.ViewModels
 
         public AddQueueError AddToQueue(bool batch)
         {
-            if (this.ScannedSource == null || string.IsNullOrEmpty(this.SelectedTitle.SourcePath) || this.ScannedSource.Titles.Count == 0)
+            if (this.ScannedSource == null || string.IsNullOrEmpty(this.SelectedTitle?.SourcePath) || this.ScannedSource.Titles.Count == 0)
             {
                 return new AddQueueError(Resources.Main_ScanSource, Resources.Error, MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -1868,12 +1868,10 @@ namespace HandBrakeWPF.ViewModels
 
                     this.isSettingPreset = false;
 
-                    if (this.userSettingService.GetUserSetting<bool>(UserSettingConstants.AutoNaming) && this.userSettingService.GetUserSetting<string>(UserSettingConstants.AutoNameFormat) != null)
+                    if (this.userSettingService.GetUserSetting<bool>(UserSettingConstants.AutoNaming))
                     {
-                        if (this.userSettingService.GetUserSetting<string>(UserSettingConstants.AutoNameFormat).Contains(Constants.Preset))
-                        {
-                            this.Destination = AutoNameHelper.AutoName(this.CurrentTask, this.SelectedTitle?.DisplaySourceName, this.SelectedTitle?.DisplaySourceName, this.selectedPreset);
-                        }
+                        if(this.userSettingService.GetUserSetting<string>(UserSettingConstants.AutoNameFormat) != null)
+                            this.ReGenerateAutoName();
                     }
 
                     return true;
