@@ -5,7 +5,39 @@
 
 Before updating HandBrake, please make sure there are no pending encodes in the queue, and be sure to make a backup of any custom presets and app preferences you have, as they may not be compatible with newer versions.
 
-Windows users, please make sure to install [Microsoft .NET Desktop Runtime version 6.0.x](https://dotnet.microsoft.com/en-us/download/dotnet/6.0). Read carefully: you need the **DESKTOP** runtime. You must install .NET 6 even if you have installed .NET 7.
+Windows users, please make sure to install [Microsoft .NET Desktop Runtime version 8.0.x](https://dotnet.microsoft.com/en-us/download/dotnet/8.0). Read carefully: you need the **DESKTOP** runtime.
+
+## HandBrake 1.8.0
+
+#### General
+
+#### Video
+
+#### Command line interface
+
+#### Audio
+
+#### Subtitles
+
+#### Build system
+
+#### Third-party libraries
+
+- Updated libraries
+  - libvpx 1.14.0 (VP8/VP9 video encoding)
+
+### Linux
+
+### Mac
+
+- Added new preference to pause encodes when switching to battery.
+- Added new preference to Clear completed jobs at launch option.
+- Reworked notification options to allow per encode or per queue control.
+
+### Windows
+
+- Requires Microsoft .NET Desktop Runtime 8.0.x
+- Added Invert Queue option to the Add to Queue Window (#5741)
 
 
 ## HandBrake 1.7.3
