@@ -21,6 +21,7 @@
 
 #include "application.h"
 #include "ghb-file-button.h"
+#include "ghb-string-list.h"
 #include "hb-backend.h"
 
 #include <fcntl.h>
@@ -187,6 +188,17 @@ ghb_widget_value(GtkWidget *widget)
         g_free(str);
 
     }
+    else if (type == GHB_TYPE_STRING_LIST)
+    {
+        char **strings = ghb_string_list_get_items(GHB_STRING_LIST(widget));
+        value = ghb_array_new();
+        for (guint i = 0; i < g_strv_length(strings); i++)
+        {
+            GhbValue *ival = ghb_string_value_new(strings[i]);
+            ghb_array_append(value, ival);
+        }
+        g_strfreev(strings);
+    }
     else
     {
         g_warning("Attempt to get unknown widget type, name %s", name);
@@ -288,7 +300,7 @@ ghb_update_widget(GtkWidget *widget, const GhbValue *value)
 
     const char *name = ghb_get_setting_key(widget);
     type = ghb_value_type(value);
-    if (type == GHB_ARRAY || type == GHB_DICT)
+    if (type == GHB_DICT)
         return;
     if (value == NULL) return;
     str = tmp = ghb_value_get_string_xform(value);
@@ -297,7 +309,7 @@ ghb_update_widget(GtkWidget *widget, const GhbValue *value)
     type = G_OBJECT_TYPE(widget);
 
     if (str == NULL)
-        str = "";
+        str = g_strdup("");
 
     if (type == GTK_TYPE_ENTRY)
     {
@@ -400,32 +412,21 @@ ghb_update_widget(GtkWidget *widget, const GhbValue *value)
     }
     else if (type == GHB_TYPE_FILE_BUTTON)
     {
-        GtkFileChooserAction action = ghb_file_button_get_action(GHB_FILE_BUTTON(widget));
-
-        if (str[0] == 0)
-        {
-            // Do nothing
-            ;
-        }
-        else if (action == GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER ||
-                 action == GTK_FILE_CHOOSER_ACTION_SAVE)
+        if (str[0] != 0)
         {
             ghb_file_button_set_filename(GHB_FILE_BUTTON(widget), str);
         }
-        else
+    }
+    else if (type == GHB_TYPE_STRING_LIST)
+    {
+        const char **strings = g_malloc0_n(ghb_array_len(value) + 1, sizeof(char *));
+        for (int j = 0; j < ghb_array_len(value); j++)
         {
-            if (g_file_test(str, G_FILE_TEST_IS_DIR) ||
-                g_file_test(str, G_FILE_TEST_EXISTS))
-            {
-                ghb_file_button_set_filename(GHB_FILE_BUTTON(widget), str);
-            }
-            else
-            {
-                char *dirname = g_path_get_dirname(str);
-                ghb_file_button_set_filename(GHB_FILE_BUTTON(widget), dirname);
-                g_free(dirname);
-            }
+            GhbValue *item = ghb_array_get(value, j);
+            strings[j] = ghb_value_get_string(item);
         }
+        ghb_string_list_set_items(GHB_STRING_LIST(widget), strings);
+        g_free(strings);
     }
     else
     {

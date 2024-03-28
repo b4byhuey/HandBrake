@@ -22,7 +22,6 @@
 #include "application.h"
 #include "audiohandler.h"
 #include "chapters.h"
-#include "compat.h"
 #include "ghb-button.h"
 #include "ghb-file-button.h"
 #include "hb-backend.h"
@@ -34,6 +33,7 @@
 #include "queuehandler.h"
 #include "resources.h"
 #include "subtitlehandler.h"
+#include "util.h"
 
 #include <fcntl.h>
 #include <libavutil/parseutils.h>
@@ -55,7 +55,7 @@
 #include <poll.h>
 #endif
 
-static void add_video_file_filters(GtkFileChooser *chooser, signal_user_data_t *ud);
+static void add_video_file_filters(GtkFileChooser *chooser);
 static void update_queue_labels(signal_user_data_t *ud);
 static void load_all_titles(signal_user_data_t *ud, int titleindex);
 static GList* dvd_device_list(void);
@@ -453,7 +453,7 @@ static GhbBinding widget_bindings[] =
     {"CustomTmpEnable", "active", NULL, "CustomTmpDir", "sensitive"},
     {"PresetCategory", "active-id", "new", "PresetCategoryName", "visible"},
     {"PresetCategory", "active-id", "new", "PresetCategoryEntryLabel", "visible"},
-    {"DiskFreeCheck", "active", NULL, "DiskFreeLimit", "sensitive"}
+    {"DiskFreeCheck", "active", NULL, "DiskFreeLimitGB", "sensitive"}
 };
 
 void
@@ -557,6 +557,7 @@ camel_convert(gchar *str)
 
             } break;
             case CAMEL_FIRST_UPPER:
+            default:
             {
                 if (*str >= 'A' && *str <= 'Z')
                     *str = *str - 'A' + 'a';
@@ -780,7 +781,7 @@ parse_datestring(const char *src, struct tm *tm)
     return 0;
 }
 
-static char*
+G_GNUC_STRFTIME(1) static char*
 get_creation_date(const char *pattern, const char *metaValue, const char *file)
 {
     char date[11] = "";
@@ -1239,7 +1240,8 @@ adjustment_configure(
 }
 
 static void
-spin_configure(signal_user_data_t *ud, char *name, double val, double min, double max)
+spin_configure (signal_user_data_t *ud, const char *name,
+                double val, double min, double max)
 {
     GtkSpinButton *spin;
     GtkAdjustment *adj;
@@ -1258,7 +1260,7 @@ spin_configure(signal_user_data_t *ud, char *name, double val, double min, doubl
 void
 ghb_scale_configure(
     signal_user_data_t *ud,
-    char *name,
+    const char *name,
     double val, double min, double max,
     double step, double page,
     int digits, gboolean inverted)
@@ -1474,11 +1476,7 @@ hide_scan_progress(signal_user_data_t *ud)
 }
 
 static void
-start_scan(
-    signal_user_data_t *ud,
-    const gchar *path,
-    gint title_id,
-    gint preview_count)
+start_scan (signal_user_data_t *ud, const char *path, int title_id, int preview_count)
 {
     GtkWidget *widget;
     ghb_status_t status;
@@ -1488,10 +1486,28 @@ start_scan(
         return;
 
     widget = ghb_builder_widget("sourcetoolbutton");
-    ghb_button_set_icon_name(GHB_BUTTON(widget), "hb-stop");
+    ghb_button_set_icon_name(GHB_BUTTON(widget), "hb-stop-small-symbolic");
     ghb_button_set_label(GHB_BUTTON(widget), _("Stop Scan"));
     gtk_widget_set_tooltip_text(widget, _("Stop Scan"));
     ghb_backend_scan(path, title_id, preview_count,
+            90000L * ghb_dict_get_int(ud->prefs, "MinTitleDuration"));
+}
+
+static void
+start_scan_list (signal_user_data_t *ud, GListModel *files, int title_id, int preview_count)
+{
+    GtkWidget *widget;
+    ghb_status_t status;
+
+    ghb_get_status(&status);
+    if (status.scan.state != GHB_STATE_IDLE)
+        return;
+
+    widget = ghb_builder_widget("sourcetoolbutton");
+    ghb_button_set_icon_name(GHB_BUTTON(widget), "hb-stop-small-symbolic");
+    ghb_button_set_label(GHB_BUTTON(widget), _("Stop Scan"));
+    gtk_widget_set_tooltip_text(widget, _("Stop Scan"));
+    ghb_backend_scan_list(files, title_id, preview_count,
             90000L * ghb_dict_get_int(ud->prefs, "MinTitleDuration"));
 }
 
@@ -1499,7 +1515,7 @@ gboolean
 ghb_idle_scan(signal_user_data_t *ud)
 {
     gchar *path;
-    // ghb_do_scan replaces "scan_source" key in dict, so we must
+    // ghb_do_scan replaces "source" key in dict, so we must
     // make a copy of the string.
     path = g_strdup(ghb_get_scan_source());
     ghb_do_scan(ud, path, 0, TRUE);
@@ -1511,16 +1527,15 @@ extern GhbValue *ghb_queue_edit_settings;
 static gchar *last_scan_file = NULL;
 
 void
-ghb_do_scan(
-    signal_user_data_t *ud,
-    const gchar *filename,
-    gint title_id,
-    gboolean force)
+ghb_do_scan_list (signal_user_data_t *ud, GListModel *files, int title_id, gboolean force)
 {
     int titleindex;
-    const hb_title_t *title;
 
-    (void)title; // Silence "unused variable" warning
+    if (!g_list_model_get_n_items(files))
+        return;
+
+    g_autoptr(GFile) file = g_list_model_get_item(files, 0);
+    const char *filename = g_file_peek_path(file);
 
     ghb_log_func();
     if (!force && last_scan_file != NULL &&
@@ -1529,7 +1544,7 @@ ghb_do_scan(
         if (ghb_queue_edit_settings != NULL)
         {
             title_id = ghb_dict_get_int(ghb_queue_edit_settings, "title");
-            title = ghb_lookup_title(title_id, &titleindex);
+            ghb_lookup_title(title_id, &titleindex);
             ghb_array_replace(ud->settings_array, titleindex,
                               ghb_queue_edit_settings);
             ud->settings = ghb_queue_edit_settings;
@@ -1538,7 +1553,50 @@ ghb_do_scan(
         }
         else
         {
-            title = ghb_lookup_title(title_id, &titleindex);
+            ghb_lookup_title(title_id, &titleindex);
+            load_all_titles(ud, titleindex);
+        }
+        return;
+    }
+    if (last_scan_file != NULL)
+        g_free(last_scan_file);
+    last_scan_file = NULL;
+    if (filename != NULL)
+    {
+        gint preview_count;
+
+        last_scan_file = g_strdup(filename);
+        ghb_set_scan_source(filename);
+
+        show_scan_progress(ud);
+        prune_logs();
+
+        preview_count = ghb_dict_get_int(ud->prefs, "preview_count");
+        start_scan_list(ud, files, title_id, preview_count);
+    }
+}
+void
+ghb_do_scan (signal_user_data_t *ud, const char *filename, int title_id, gboolean force)
+{
+    int titleindex;
+
+    ghb_log_func();
+    if (!force && last_scan_file != NULL &&
+        strcmp(last_scan_file, filename) == 0)
+    {
+        if (ghb_queue_edit_settings != NULL)
+        {
+            title_id = ghb_dict_get_int(ghb_queue_edit_settings, "title");
+            ghb_lookup_title(title_id, &titleindex);
+            ghb_array_replace(ud->settings_array, titleindex,
+                              ghb_queue_edit_settings);
+            ud->settings = ghb_queue_edit_settings;
+            ghb_load_settings(ud);
+            ghb_queue_edit_settings = NULL;
+        }
+        else
+        {
+            ghb_lookup_title(title_id, &titleindex);
             load_all_titles(ud, titleindex);
         }
         return;
@@ -1610,6 +1668,7 @@ source_dialog_response_cb(GtkFileChooser *chooser,
 {
     if (response == GTK_RESPONSE_ACCEPT)
     {
+
         if (g_strcmp0(gtk_file_chooser_get_choice(chooser, "single"), "true") == 0)
         {
             single_title_dialog(chooser);
@@ -1627,42 +1686,148 @@ source_dialog_response_cb(GtkFileChooser *chooser,
     }
 }
 
+static int
+file_name_compare (GFile *file1, GFile *file2, gpointer data)
+{
+    return g_strcmp0(g_file_peek_path(file1), g_file_peek_path(file2));
+}
+
+static gboolean
+file_has_allowed_extension (GFile *file, hb_list_t *exclude_extensions)
+{
+    const char *filename = g_file_peek_path(file);
+
+    for (int i = 0; i < hb_list_count(exclude_extensions); i++)
+    {
+        if (hb_str_ends_with(filename, hb_list_item(exclude_extensions, i)))
+        {
+            g_debug("Excluded file %s", filename);
+            return FALSE;
+        }
+    }
+    g_debug("Found file %s", filename);
+    return TRUE;
+}
+
+static void
+scan_directory (GFile *dir, GListStore *file_list, gboolean recursive)
+{
+    g_autoptr(GFileEnumerator) dir_enum = NULL;
+    g_autoptr(GError) error = NULL;
+
+    ghb_log("Searching directory %s", g_file_peek_path(dir));
+
+    // Get info about the files in the directory
+    dir_enum = g_file_enumerate_children(dir, "standard::name,standard::is-symlink,standard::type",
+                                         G_FILE_QUERY_INFO_NONE, NULL, &error);
+
+    if (dir_enum)
+    {
+        GFileInfo *info;
+        GFile *file;
+        hb_list_t *extensions = ghb_get_excluded_extensions_list();
+
+        while (g_file_enumerator_iterate(dir_enum, &info, &file, NULL, &error))
+        {
+            if (!info) break;
+
+            // Avoid symlinks to directories in order to avoid infinite loops
+            if (recursive && !g_file_info_get_is_symlink(info)
+                && g_file_info_get_file_type(info) == G_FILE_TYPE_DIRECTORY)
+            {
+                scan_directory(file, file_list, TRUE);
+            }
+            else if (g_file_info_get_file_type(info) == G_FILE_TYPE_REGULAR
+                     && file_has_allowed_extension(file, extensions))
+            {
+                g_debug("Found file: %s", g_file_peek_path(file));
+                g_list_store_insert_sorted(file_list, g_object_ref(file),
+                                           (GCompareDataFunc) file_name_compare, NULL);
+            }
+        }
+        if (error)
+        {
+            g_warning("Could not scan files: %s", error->message);
+        }
+        ghb_free_list(extensions);
+    }
+    else
+    {
+        g_warning("Could not enumerate directory: %s", error->message);
+    }
+}
+
 static void
 source_dialog_start_scan (GtkFileChooser *chooser, int title_id)
 {
-    const char *sourcename;
-    const char *drivename = NULL;
-    GFile *file;
-    char *filename;
+    gboolean recursive = FALSE;
+    g_autoptr(GListModel) files = NULL;
+    g_autofree char *def_src = NULL;
     signal_user_data_t *ud = ghb_ud();
 
-    if (has_drive)
-        drivename = gtk_file_chooser_get_choice(chooser, "drive");
-
-    if (drivename && g_strcmp0(drivename, _("Not Selected")))
-        filename = g_strdup(drivename);
-    else
+    if (gtk_file_chooser_get_action(chooser) == GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER)
     {
-        file = gtk_file_chooser_get_file(chooser);
-        filename = g_file_get_path(file);
-        g_object_unref(file);
+        // The recursive choice only exists in directory mode
+        recursive = !g_strcmp0(gtk_file_chooser_get_choice(chooser, "recursive"), "true");
+        ghb_dict_set_bool(ud->prefs, "RecursiveFolderScan", recursive);
+        ghb_pref_save(ud->prefs, "RecursiveFolderScan");
+    }
+    else if (has_drive)
+    {
+        // The drive choice only exists in file mode when a DVD drive is detected
+        const char *drivename = gtk_file_chooser_get_choice(chooser, "drive");
+        if (drivename && g_strcmp0(drivename, _("Not Selected")))
+        {
+            files = G_LIST_MODEL(g_list_store_new(G_TYPE_FILE));
+            g_list_store_append(G_LIST_STORE(files), g_file_new_for_path(drivename));
+            def_src = g_strdup(drivename);
+        }
     }
 
-    if (filename != NULL)
+    if (!def_src)
     {
-        sourcename = ghb_get_scan_source();
+        g_autoptr(GListModel) selected_files = gtk_file_chooser_get_files(chooser);
 
-        // ghb_do_scan replaces "scan_source" key in dict, so we must
+        if (g_list_model_get_n_items(selected_files))
+        {
+            g_autoptr(GFile) file = g_list_model_get_item(selected_files, 0);
+            def_src = g_file_get_path(file);
+        }
+
+        if (recursive)
+        {
+            // Scan the directories provided for files
+            GListStore *out_files = g_list_store_new(G_TYPE_FILE);
+            for (guint i = 0; i < g_list_model_get_n_items(selected_files); i++)
+            {
+                g_autoptr(GFile) dir = g_list_model_get_item(selected_files, i);
+                scan_directory(dir, out_files, TRUE);
+            }
+            files = G_LIST_MODEL(out_files);
+            ghb_log("Recursive scan found %u files", g_list_model_get_n_items(files));
+        }
+        else
+        {
+            // Use the list of chosen files or folders directly
+            files = g_steal_pointer(&selected_files);
+        }
+    }
+
+    if (def_src != NULL && def_src[0] != '\0')
+    {
+        const char *sourcename = ghb_get_scan_source();
+
+        // ghb_do_scan replaces "source" key in dict, so we must
         // be finished with sourcename before calling ghb_do_scan
         // since the memory it references will be freed
-        if (strcmp(sourcename, filename) != 0)
+        if (strcmp(sourcename, def_src) != 0)
         {
-            ghb_dict_set_string(ud->prefs, "default_source", filename);
+            ghb_dict_set_string(ud->prefs, "default_source", def_src);
             ghb_pref_save(ud->prefs, "default_source");
-            ghb_dvd_set_current(filename, ud);
+            ghb_dvd_set_current(def_src, ud);
         }
-        ghb_do_scan(ud, filename, title_id, TRUE);
-        g_free(filename);
+        if (files)
+            ghb_do_scan_list(ud, files, title_id, TRUE);
     }
     source_dialog = NULL;
     gtk_native_dialog_destroy(GTK_NATIVE_DIALOG(chooser));
@@ -1686,6 +1851,7 @@ do_source_dialog(gboolean dir, signal_user_data_t *ud)
     GtkWindow *hb_window;
     const gchar *sourcename;
 
+    ghb_log_func();
     if (source_dialog)
         return;
 
@@ -1697,13 +1863,21 @@ do_source_dialog(gboolean dir, signal_user_data_t *ud)
                 _("_Open"),
                 _("_Cancel"));
 
-    ghb_log_func();
     sourcename = ghb_get_scan_source();
 
-    if (!dir)
-        add_video_file_filters(GTK_FILE_CHOOSER(chooser), ud);
-
-    source_dialog_drive_list(GTK_FILE_CHOOSER(chooser), ud);
+    if (dir)
+    {
+        gtk_file_chooser_add_choice(GTK_FILE_CHOOSER(chooser), "recursive",
+                _("Recursively scan directories"), NULL, NULL);
+        gtk_file_chooser_set_choice(GTK_FILE_CHOOSER(chooser), "recursive",
+                ghb_dict_get_bool(ud->prefs, "RecursiveFolderScan") ? "true" : "false");
+    }
+    else
+    {
+        gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(chooser), TRUE);
+        source_dialog_drive_list(GTK_FILE_CHOOSER(chooser), ud);
+        add_video_file_filters(GTK_FILE_CHOOSER(chooser));
+    }
 
     gtk_file_chooser_add_choice(GTK_FILE_CHOOSER(chooser), "single",
                                 _("Single Title"), NULL, NULL);
@@ -1762,7 +1936,7 @@ dvd_source_activate_cb(GSimpleAction *action, GVariant *param,
     const gchar *filename;
     const gchar *sourcename;
 
-    // ghb_do_scan replaces "scan_source" key in dict, so we must
+    // ghb_do_scan replaces "source" key in dict, so we must
     // be finished with sourcename before calling ghb_do_scan
     // since the memory it references will be freed
     sourcename = ghb_get_scan_source();
@@ -1779,7 +1953,7 @@ dvd_source_activate_cb(GSimpleAction *action, GVariant *param,
 void
 ghb_update_destination_extension(signal_user_data_t *ud)
 {
-    static gchar *containers[] = {".mkv", ".mp4", ".m4v", ".webm", ".error", NULL};
+    static const char *containers[] = {".mkv", ".mp4", ".m4v", ".webm", ".error", NULL};
     gchar *filename;
     const gchar *extension;
     gint ii;
@@ -1923,26 +2097,18 @@ destination_response_cb(GtkFileChooserNative *chooser,
                         GtkResponseType response, signal_user_data_t *ud)
 {
     GtkEditable *entry;
-    gchar *basename;
+    g_autofree char *basename = NULL;
 
     if (response == GTK_RESPONSE_ACCEPT)
     {
-        GFile *file;
-        char *filename, *dirname;
-        GhbFileButton *dest_chooser;
-
-        file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER (chooser));
-        filename = g_file_get_path(file);
+        g_autoptr(GFile) file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(chooser));
+        const char *filename = g_file_peek_path(file);
+        g_autofree char *dirname = g_path_get_dirname(filename);
         basename = g_path_get_basename(filename);
-        dirname = g_path_get_dirname(filename);
         entry = GTK_EDITABLE(ghb_builder_widget("dest_file"));
         gtk_editable_set_text(entry, basename);
-        dest_chooser = GHB_FILE_BUTTON(ghb_builder_widget("dest_dir"));
+        GhbFileButton *dest_chooser = GHB_FILE_BUTTON(ghb_builder_widget("dest_dir"));
         ghb_file_button_set_filename(dest_chooser, dirname);
-        g_object_unref(file);
-        g_free (dirname);
-        g_free (basename);
-        g_free (filename);
     }
     gtk_native_dialog_destroy(GTK_NATIVE_DIALOG(chooser));
 }
@@ -2606,8 +2772,6 @@ ghb_set_title_settings(signal_user_data_t *ud, GhbValue *settings)
 
         if (ghb_dict_get_bool(settings, "MetadataPassthrough"))
         {
-            ghb_dict_set_string(settings, "MetaName", title->name);
-            update_meta(settings, "Name", title->name);
             if (title->metadata && title->metadata->dict)
             {
 
@@ -2844,8 +3008,6 @@ meta_pass_changed_cb (GtkWidget *widget, gpointer data)
         ghb_dict_get_bool(ud->settings, "MetadataPassthrough"))
     {
         // Reload metadata from title
-        ghb_dict_set_string(ud->settings, "MetaName", title->name);
-        update_meta(ud->settings, "Name", title->name);
         if (title->metadata && title->metadata->dict)
         {
 
@@ -4015,8 +4177,7 @@ start_new_log(signal_user_data_t *ud, GhbValue *uiDict)
 static void
 submit_job(signal_user_data_t *ud, GhbValue *queueDict)
 {
-    gchar *type, *modified;
-    const char *name;
+    const char *name, *type, *modified;
     GhbValue *uiDict;
     gboolean preset_modified;
 
@@ -4040,7 +4201,7 @@ submit_job(signal_user_data_t *ud, GhbValue *queueDict)
 
     // Show queue progress bar
     int index = ghb_find_queue_job(ud->queue, unique_id, NULL);
-    ghb_queue_progress_set_visible(ud, index, 1);
+    ghb_queue_item_set_status(ud, index, GHB_QUEUE_RUNNING);
 }
 
 static void
@@ -4123,7 +4284,7 @@ ghb_update_pending(signal_user_data_t *ud)
                                    pending), pending);
 
     label = GTK_LABEL(ghb_builder_widget("pending_status"));
-    gtk_label_set_text(label, str);
+    gtk_label_set_text(label, pending ? str : ""); // Hide this label if no pending items
     label = GTK_LABEL(ghb_builder_widget("queue_status_label"));
     gtk_label_set_text(label, str);
     g_free(str);
@@ -4421,8 +4582,6 @@ ghb_backend_events(signal_user_data_t *ud)
     }
     else if (status.queue.state & GHB_STATE_SEARCHING)
     {
-        gchar *status_str;
-
         status_str = searching_status_string(ud, &status.queue);
         gtk_label_set_text (work_status, status_str);
         gtk_progress_bar_set_fraction(progress, status.queue.progress);
@@ -4431,8 +4590,6 @@ ghb_backend_events(signal_user_data_t *ud)
     }
     else if (status.queue.state & GHB_STATE_WORKING)
     {
-        gchar *status_str;
-
         status_str = working_status_string(ud, &status.queue);
         gtk_label_set_text (work_status, status_str);
         gtk_progress_bar_set_fraction (progress, status.queue.progress);
@@ -4469,10 +4626,9 @@ ghb_backend_events(signal_user_data_t *ud)
             ghb_dict_set_int(uiDict, "job_finish_time", now);
             ghb_dict_set_int(uiDict, "job_pause_time_ms", status.queue.paused);
         }
-        ghb_queue_update_status_icon(ud, index);
         ghb_queue_update_live_stats(ud, index, &status.queue);
         gtk_progress_bar_set_fraction(progress, 1.0);
-        ghb_queue_progress_set_visible(ud, index, FALSE);
+        ghb_queue_item_set_status(ud, index, qstatus);
         ghb_queue_progress_set_fraction(ud, index, 1.0);
 
         ghb_clear_queue_state(GHB_STATE_WORKDONE);
@@ -4642,7 +4798,7 @@ show_activity_action_cb(GSimpleAction *action, GVariant *value,
 }
 
 void
-ghb_log(gchar *log, ...)
+ghb_log (const char *log, ...)
 {
     va_list args;
     time_t _now;
@@ -4670,9 +4826,10 @@ browse_uri_finish (GtkWindow *parent, GAsyncResult *result, gpointer data)
 }
 
 void
-ghb_browse_uri(signal_user_data_t *ud, const gchar *uri)
+ghb_browse_uri (const gchar *uri)
 {
-    GtkWindow *parent = GTK_WINDOW(ghb_builder_widget("hb_window"));
+    GtkApplication *app = GTK_APPLICATION(g_application_get_default());
+    GtkWindow *parent = gtk_application_get_active_window(app);
     gtk_show_uri_full(parent, uri, GDK_CURRENT_TIME, NULL,
                       (GAsyncReadyCallback)browse_uri_finish, NULL);
 }
@@ -4740,7 +4897,7 @@ about_action_cb (GSimpleAction *action, GVariant *param, signal_user_data_t *ud)
 G_MODULE_EXPORT void
 guide_action_cb(GSimpleAction *action, GVariant *param, signal_user_data_t *ud)
 {
-    ghb_browse_uri(ud, HB_DOCS);
+    ghb_browse_uri(HB_DOCS);
 }
 
 static void
@@ -4772,7 +4929,7 @@ ghb_hbfd(signal_user_data_t *ud, gboolean hbfd)
     ghb_log_func();
     widget = ghb_builder_widget("queue_pause");
     gtk_widget_set_visible(widget, !hbfd);
-    widget = ghb_builder_widget("queue_add");
+    widget = ghb_builder_widget("queue_add_split_button");
     gtk_widget_set_visible(widget, !hbfd);
     widget = ghb_builder_widget("show_queue");
     gtk_widget_set_visible(widget, !hbfd);
@@ -4867,6 +5024,19 @@ pref_changed_cb (GtkWidget *widget, gpointer data)
 {
     signal_user_data_t *ud = ghb_ud();
     ghb_widget_to_setting (ud->prefs, widget);
+
+    const gchar *name = ghb_get_setting_key(widget);
+    ghb_pref_set(ud->prefs, name);
+}
+
+G_MODULE_EXPORT void
+excluded_extensions_update (GObject *gobject, GParamSpec *pspec,
+                            gpointer user_data)
+{
+    GtkWidget *widget = ghb_builder_widget("ExcludedFileExtensions");
+    signal_user_data_t *ud = ghb_ud();
+
+    ghb_widget_to_setting(ud->prefs, widget);
 
     const gchar *name = ghb_get_setting_key(widget);
     ghb_pref_set(ud->prefs, name);
@@ -5415,7 +5585,6 @@ presets_list_context_menu_cb (GtkGesture *gest, gint n_press, double x,
 
 
 GtkFileFilter *ghb_add_file_filter(GtkFileChooser *chooser,
-                                   signal_user_data_t *ud,
                                    const char *name, const char *id)
 {
     g_autoptr(GtkFileFilter) filter = GTK_FILE_FILTER(ghb_builder_object(id));
@@ -5425,22 +5594,22 @@ GtkFileFilter *ghb_add_file_filter(GtkFileChooser *chooser,
 }
 
 static void
-add_video_file_filters (GtkFileChooser *chooser, signal_user_data_t *ud)
+add_video_file_filters (GtkFileChooser *chooser)
 {
-    ghb_add_file_filter(chooser, ud, _("All Files"), "FilterAll");
-    ghb_add_file_filter(chooser, ud, _("Video"), "SourceFilterVideo");
-    ghb_add_file_filter(chooser, ud, g_content_type_get_description("video/mp4"), "SourceFilterMP4");
-    ghb_add_file_filter(chooser, ud, g_content_type_get_description("video/mp2t"), "SourceFilterTS");
-    ghb_add_file_filter(chooser, ud, g_content_type_get_description("video/mpeg"), "SourceFilterMPG");
-    ghb_add_file_filter(chooser, ud, g_content_type_get_description("video/x-matroska"), "SourceFilterMKV");
-    ghb_add_file_filter(chooser, ud, g_content_type_get_description("video/webm"), "SourceFilterWebM");
-    ghb_add_file_filter(chooser, ud, g_content_type_get_description("video/ogg"), "SourceFilterOGG");
-    ghb_add_file_filter(chooser, ud, g_content_type_get_description("video/x-msvideo"), "SourceFilterAVI");
-    ghb_add_file_filter(chooser, ud, g_content_type_get_description("video/x-flv"), "SourceFilterFLV");
-    ghb_add_file_filter(chooser, ud, g_content_type_get_description("video/quicktime"), "SourceFilterMOV");
-    ghb_add_file_filter(chooser, ud, g_content_type_get_description("video/x-ms-wmv"), "SourceFilterWMV");
-    ghb_add_file_filter(chooser, ud, "EVO", "SourceFilterEVO");
-    ghb_add_file_filter(chooser, ud, "VOB", "SourceFilterVOB");
+    ghb_add_file_filter(chooser, _("All Files"), "FilterAll");
+    ghb_add_file_filter(chooser, _("Video"), "SourceFilterVideo");
+    ghb_add_file_filter(chooser, g_content_type_get_description("video/mp4"), "SourceFilterMP4");
+    ghb_add_file_filter(chooser, g_content_type_get_description("video/mp2t"), "SourceFilterTS");
+    ghb_add_file_filter(chooser, g_content_type_get_description("video/mpeg"), "SourceFilterMPG");
+    ghb_add_file_filter(chooser, g_content_type_get_description("video/x-matroska"), "SourceFilterMKV");
+    ghb_add_file_filter(chooser, g_content_type_get_description("video/webm"), "SourceFilterWebM");
+    ghb_add_file_filter(chooser, g_content_type_get_description("video/ogg"), "SourceFilterOGG");
+    ghb_add_file_filter(chooser, g_content_type_get_description("video/x-msvideo"), "SourceFilterAVI");
+    ghb_add_file_filter(chooser, g_content_type_get_description("video/x-flv"), "SourceFilterFLV");
+    ghb_add_file_filter(chooser, g_content_type_get_description("video/quicktime"), "SourceFilterMOV");
+    ghb_add_file_filter(chooser, g_content_type_get_description("video/x-ms-wmv"), "SourceFilterWMV");
+    ghb_add_file_filter(chooser, "EVO", "SourceFilterEVO");
+    ghb_add_file_filter(chooser, "VOB", "SourceFilterVOB");
 }
 G_MODULE_EXPORT gboolean
 combo_search_key_press_cb(
@@ -5482,6 +5651,15 @@ log_directory_action_cb (GSimpleAction *action, GVariant *param, signal_user_dat
     if (!uri || !uri[0])
         return;
 
-    ghb_browse_uri(ud, uri);
+    ghb_browse_uri(uri);
 }
 
+G_MODULE_EXPORT void
+string_list_changed_cb (GtkStringList *self, guint position,
+                        guint removed, guint added, gpointer user_data)
+{
+    for (int i = 0; i < g_list_model_get_n_items(G_LIST_MODEL(self)); i++)
+    {
+         printf("String: %s\n", gtk_string_list_get_string(self, i));
+    }
+}

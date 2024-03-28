@@ -38,14 +38,14 @@
 
 typedef struct
 {
-    gchar *option;
-    const gchar *shortOpt;
-    gdouble ivalue;
+    const char *option;
+    const char *shortOpt;
+    double ivalue;
 } options_map_t;
 
 typedef struct
 {
-    gint count;
+    int count;
     options_map_t *map;
 } combo_opts_t;
 
@@ -1622,8 +1622,8 @@ video_framerate_opts_set(signal_user_data_t *ud, const gchar *name,
     for (rate = hb_video_framerate_get_next(NULL); rate != NULL;
          rate = hb_video_framerate_get_next(rate))
     {
-        gchar *desc = "";
-        gchar *option;
+        const char *desc = "";
+        char *option;
         if (strcmp(rate->name, "23.976") == 0)
         {
             desc = _("(NTSC Film)");
@@ -2254,6 +2254,7 @@ camel_convert(gchar *str)
 
             } break;
             case CAMEL_FIRST_UPPER:
+            default:
             {
                 if (*str >= 'A' && *str <= 'Z')
                     *str = *str - 'A' + 'a';
@@ -3017,6 +3018,7 @@ generic_opt_get(const char *name, const void *vopts,
             return ghb_double_value_new(val);
         } break;
         case GHB_STRING:
+        default:
         {
             const char *val;
             val = lookup_generic_option(opts, gval);
@@ -3052,6 +3054,7 @@ filter_opt_get2(const char *name, const GhbValue *gval, GhbType type,
             return ghb_int_value_new(val);
         } break;
         case GHB_STRING:
+        default:
         {
             const char *val;
             val = lookup_param_option(param, gval);
@@ -3488,10 +3491,79 @@ void ghb_backend_scan_stop (void)
     hb_scan_stop( h_scan );
 }
 
-void
-ghb_backend_scan(const char *path, int titleindex, int preview_count, uint64_t min_duration)
+hb_list_t *
+ghb_get_excluded_extensions_list (void)
 {
-    hb_scan( h_scan, path, titleindex, preview_count, 1, min_duration, 0, 0, NULL, 0 );
+    signal_user_data_t *ud = ghb_ud();
+
+    GhbValue *ext_array = ghb_dict_get(ud->prefs, "ExcludedFileExtensions");
+
+    if (!ext_array) return NULL;
+
+    hb_list_t *ext_list = hb_list_init();
+    for (int i = 0; i < hb_value_array_len(ext_array); i++)
+    {
+        hb_value_t *value = hb_value_array_get(ext_array, i);
+        const char *ext = ghb_value_get_string(value);
+        if (ext && ext[0])
+            hb_list_add(ext_list, g_strdup(ext));
+        ghb_log("Excluded extension %s", ext);
+    }
+    return ext_list;
+}
+
+void
+ghb_free_list (hb_list_t *list)
+{
+    for (int i = 0; i < hb_list_count(list); i++)
+    {
+        g_free(hb_list_item(list, i));
+    }
+    hb_list_close(&list);
+}
+
+hb_list_t *
+get_path_list(GListModel *files)
+{
+    g_return_val_if_fail(g_list_model_get_item_type(files) == G_TYPE_FILE, NULL);
+    hb_list_t *path_list = hb_list_init();
+    for (guint i = 0; i < g_list_model_get_n_items(files); i++)
+    {
+        g_autoptr(GFile) file = g_list_model_get_item(files, i);
+        hb_list_add(path_list, g_file_get_path(file));
+    }
+    return path_list;
+}
+
+void
+ghb_backend_scan_list (GListModel *files, int titleindex, int preview_count, uint64_t min_duration)
+{
+    hb_list_t *path_list = get_path_list(files);
+    hb_list_t *extensions = ghb_get_excluded_extensions_list();
+    hb_scan_list(h_scan, path_list, titleindex, preview_count, 1, min_duration,
+                 0, 0, extensions, 0);
+    ghb_free_list(path_list);
+    ghb_free_list(extensions);
+    hb_status.scan.state |= GHB_STATE_SCANNING;
+    // initialize count and cur to something that won't cause FPE
+    // when computing progress
+    hb_status.scan.title_count = 1;
+    hb_status.scan.title_cur = 0;
+    hb_status.scan.preview_count = 1;
+    hb_status.scan.preview_cur = 0;
+    hb_status.scan.progress = 0;
+}
+
+void
+ghb_backend_scan (const char *path, int titleindex, int preview_count, uint64_t min_duration)
+{
+    hb_list_t *path_list = hb_list_init();
+    hb_list_add(path_list, (void *)path);
+    hb_list_t *extensions = ghb_get_excluded_extensions_list();
+    hb_scan_list(h_scan, path_list, titleindex, preview_count, 1, min_duration,
+                 0, 0, extensions, 0);
+    hb_list_close(&path_list);
+    ghb_free_list(extensions);
     hb_status.scan.state |= GHB_STATE_SCANNING;
     // initialize count and cur to something that won't cause FPE
     // when computing progress
@@ -3506,7 +3578,12 @@ void
 ghb_backend_queue_scan(const gchar *path, gint titlenum)
 {
     ghb_log_func();
-    hb_scan( h_queue, path, titlenum, -1, 0, 0, 0, 0, NULL, 0 );
+    hb_list_t *extensions = ghb_get_excluded_extensions_list();
+    hb_list_t *path_list = hb_list_init();
+    hb_list_add(path_list, (void *)path);
+    hb_scan_list(h_queue, path_list, titlenum, -1, 0, 0, 0, 0, extensions, 0);
+    ghb_free_list(extensions);
+    hb_list_close(&path_list);
     hb_status.queue.state |= GHB_STATE_SCANNING;
 }
 
@@ -3767,6 +3844,10 @@ ghb_picture_settings_deps(signal_user_data_t *ud)
     widget = ghb_builder_widget("PictureWidth");
     gtk_widget_set_visible(widget, custom_resolution_limit);
     widget = ghb_builder_widget("PictureHeight");
+    gtk_widget_set_visible(widget, custom_resolution_limit);
+    widget = ghb_builder_widget("maximum_size_label");
+    gtk_widget_set_visible(widget, custom_resolution_limit);
+    widget = ghb_builder_widget("maximum_size_x_label");
     gtk_widget_set_visible(widget, custom_resolution_limit);
 
     widget = ghb_builder_widget("PictureTopCrop");
@@ -4167,7 +4248,7 @@ ghb_set_custom_filter_tooltip(signal_user_data_t *ud,
                               int filter_id)
 {
     char ** keys = hb_filter_get_keys(filter_id);
-    char  * colon = "", * newline;
+    const char *colon = "";
     char    tooltip[1024];
     int     ii, linelen = 0, pos = 0;
 
@@ -4180,6 +4261,7 @@ ghb_set_custom_filter_tooltip(signal_user_data_t *ud,
                     "Custom %s filter string format:\n\n", desc);
     for (ii = 0; keys[ii] != NULL && pos < 1024; ii++)
     {
+        const char *newline;
         int c = tolower(keys[ii][0]);
         int len = strlen(keys[ii]) + 3;
         if (linelen + len > 60)

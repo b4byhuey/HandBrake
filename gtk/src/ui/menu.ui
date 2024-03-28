@@ -301,12 +301,12 @@
     </section>
     <section>
       <item>
-        <attribute name="label" translatable="yes">Open _Encode Log Directory</attribute>
-        <attribute name="action">app.queue-open-log-dir</attribute>
-      </item>
-      <item>
         <attribute name="label" translatable="yes">Open Encode _Log</attribute>
         <attribute name="action">app.queue-open-log</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Open _Encode Log Directory</attribute>
+        <attribute name="action">app.queue-open-log-dir</attribute>
       </item>
     </section>
   </menu>
@@ -379,6 +379,16 @@
     </section>
     <section>
       <item>
+        <attribute name="label" translatable="yes">Open Encode _Log</attribute>
+        <attribute name="action">app.queue-open-log</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Open _Encode Log Directory</attribute>
+        <attribute name="action">app.queue-open-log-dir</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
         <attribute name="action">app.queue-move-top</attribute>
         <attribute name="label" translatable="yes">Move to _Top</attribute>
       </item>
@@ -429,6 +439,18 @@
       <item>
         <attribute name="action">app.subtitle-add-fas</attribute>
         <attribute name="label" translatable="yes">Add _Foreign Audio Scan</attribute>
+      </item>
+    </section>
+  </menu>
+  <menu id="queue-add-menu-model">
+    <section>
+      <item>
+        <attribute name="action">app.add-multiple</attribute>
+        <attribute name="label" translatable="yes">Add _Multiple…</attribute>
+      </item>
+      <item>
+        <attribute name="action">app.add-all</attribute>
+        <attribute name="label" translatable="yes">Add A_ll</attribute>
       </item>
     </section>
   </menu>

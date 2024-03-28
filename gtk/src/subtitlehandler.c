@@ -28,6 +28,7 @@
 #include "presets.h"
 #include "preview.h"
 #include "titledict.h"
+#include "util.h"
 
 static char * subtitle_get_track_description(GhbValue *settings,
                                              GhbValue *subsettings);
@@ -1011,7 +1012,7 @@ import_file_changed_cb (GtkWidget *widget, gpointer data)
 }
 
 G_MODULE_EXPORT void
-import_lang_changed_cb (GtkWidget *widget, gpointer data)
+import_lang_changed_cb (GtkWidget *widget, GParamSpec *pspec, gpointer userdata)
 {
     signal_user_data_t *ud = ghb_ud();
     ghb_widget_to_setting(ud->settings, widget);
@@ -1125,6 +1126,56 @@ static gboolean subtitle_is_one_burned(GhbValue *settings)
         }
     }
     return FALSE;
+}
+
+G_MODULE_EXPORT void
+ghb_add_subtitle_files (GListModel *files, signal_user_data_t *ud)
+{
+    // Add the current subtitle settings to the list.
+    GhbValue *subsettings, *import;
+    gboolean one_burned;
+
+    g_return_if_fail(g_list_model_get_item_type(files) == G_TYPE_FILE);
+
+    const char *pref_lang;
+    int title_id, titleindex;
+    const hb_title_t *title;
+
+    title_id = ghb_dict_get_int(ud->settings, "title");
+    title = ghb_lookup_title(title_id, &titleindex);
+    if (title == NULL)
+    {
+        return;
+    }
+
+    one_burned = subtitle_is_one_burned(ud->settings);
+
+    const char *mux_id = ghb_dict_get_string(ud->settings, "FileFormat");
+    const hb_container_t *mux = ghb_lookup_container_by_name(mux_id);
+
+    for (guint i = 0; i < g_list_model_get_n_items(files); i++)
+    {
+        g_autoptr(GFile) file = g_list_model_get_item(files, i);
+        const char *filename = g_file_peek_path(file);
+
+        subsettings = subtitle_add_track(ud, ud->settings, 0,
+                                         mux->format, FALSE, TRUE, IMPORTSRT,
+                                         FALSE, &one_burned);
+
+        if (!subsettings)
+            break;
+
+        import = ghb_dict_new();
+        ghb_dict_set(subsettings, "Import", import);
+        pref_lang = ghb_dict_get_string(ud->settings, "PreferredLanguage");
+        ghb_dict_set_string(import, "Language", pref_lang);
+        ghb_dict_set_string(import, "Codeset", "UTF-8");
+        ghb_dict_set_string(import, "Filename", filename);
+        ghb_dict_set_string(import, "Format",
+                            ghb_file_is_ssa_subtitle(filename) ? "SSA" : "SRT");
+
+        add_subtitle_to_ui(ud, subsettings);
+    }
 }
 
 G_MODULE_EXPORT void
@@ -1329,7 +1380,6 @@ ghb_subtitle_prune(signal_user_data_t *ud)
 {
     GhbValue *subtitle_list;
     GhbValue *subsettings;
-    gint ii;
     gboolean one_burned = FALSE;
 
     subtitle_list = ghb_get_job_subtitle_list(ud->settings);
@@ -1342,7 +1392,7 @@ ghb_subtitle_prune(signal_user_data_t *ud)
     mux_id = ghb_dict_get_string(ud->settings, "FileFormat");
     mux = ghb_lookup_container_by_name(mux_id);
 
-    for (ii = 0; ii < ghb_array_len(subtitle_list); )
+    for (guint ii = 0; ii < ghb_array_len(subtitle_list); )
     {
         gboolean burned;
         int source;
@@ -1838,8 +1888,8 @@ subtitle_remove_cb (GSimpleAction *action, GVariant *param, gpointer data)
                 gtk_tree_store_remove(GTK_TREE_STORE(tm), &ti);
 
                 // Enable FAS button
-                GSimpleAction *action = G_SIMPLE_ACTION(GHB_ACTION("subtitle-add-fas"));
-                g_simple_action_set_enabled(action, 1);
+                GSimpleAction *fas_action = G_SIMPLE_ACTION(GHB_ACTION("subtitle-add-fas"));
+                g_simple_action_set_enabled(fas_action, 1);
                 ghb_update_summary_info(ud);
                 return;
             }

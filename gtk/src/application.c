@@ -33,6 +33,7 @@
 #include "resources.h"
 #include "subtitlehandler.h"
 #include "ui_res.h"
+#include "util.h"
 #include "values.h"
 
 #include <fcntl.h>
@@ -61,15 +62,16 @@ struct _GhbApplication
     int cancel_encode;
     int when_complete;
     int stderr_src_id;
-    char *scan_source;
 };
 
-G_DEFINE_TYPE (GhbApplication, ghb_application, GTK_TYPE_APPLICATION);
+G_DEFINE_TYPE (GhbApplication, ghb_application, GTK_TYPE_APPLICATION)
 
 #define BUILDER_NAME "ghb"
 
 static char *dvd_device = NULL;
 static char *arg_preset = NULL;
+static gboolean auto_start_queue = FALSE;
+static gboolean clear_queue = FALSE;
 static gboolean redirect_io = TRUE;
 
 static GtkBuilder*
@@ -395,6 +397,7 @@ GHB_DECLARE_ACTION_CB(queue_reset_fail_action_cb);
 GHB_DECLARE_ACTION_CB(queue_reset_all_action_cb);
 GHB_DECLARE_ACTION_CB(queue_reset_action_cb);
 GHB_DECLARE_ACTION_CB(queue_edit_action_cb);
+GHB_DECLARE_ACTION_CB(queue_show_sidebar_action_cb);
 GHB_DECLARE_ACTION_CB(show_presets_action_cb);
 GHB_DECLARE_ACTION_CB(hbfd_action_cb);
 GHB_DECLARE_ACTION_CB(show_queue_action_cb);
@@ -402,7 +405,6 @@ GHB_DECLARE_ACTION_CB(show_preview_action_cb);
 GHB_DECLARE_ACTION_CB(show_activity_action_cb);
 GHB_DECLARE_ACTION_CB(show_audio_defaults_cb);
 GHB_DECLARE_ACTION_CB(show_subtitle_defaults_cb);
-GHB_DECLARE_ACTION_CB(show_activity_action_cb);
 GHB_DECLARE_ACTION_CB(preset_save_action_cb);
 GHB_DECLARE_ACTION_CB(preset_save_as_action_cb);
 GHB_DECLARE_ACTION_CB(preset_rename_action_cb);
@@ -422,6 +424,7 @@ GHB_DECLARE_ACTION_CB(log_copy_action_cb);
 GHB_DECLARE_ACTION_CB(log_directory_action_cb);
 GHB_DECLARE_ACTION_CB(title_add_select_all_cb);
 GHB_DECLARE_ACTION_CB(title_add_clear_all_cb);
+GHB_DECLARE_ACTION_CB(title_add_invert_cb);
 GHB_DECLARE_ACTION_CB(audio_add_cb);
 GHB_DECLARE_ACTION_CB(audio_add_all_cb);
 GHB_DECLARE_ACTION_CB(audio_reset_cb);
@@ -472,6 +475,8 @@ map_actions (GtkApplication *app, signal_user_data_t *ud)
         { "queue-export",          queue_export_action_cb          },
         { "queue-import",          queue_import_action_cb          },
         { "queue-edit",            queue_edit_action_cb            },
+        { "queue-show-sidebar",    NULL,
+          NULL, "false",           queue_show_sidebar_action_cb    },
         { "dvd-open",              dvd_source_activate_cb, "s"     },
         { "hbfd",                  NULL,
           NULL, "false",           hbfd_action_cb                  },
@@ -501,6 +506,7 @@ map_actions (GtkApplication *app, signal_user_data_t *ud)
         { "log-directory",         log_directory_action_cb         },
         { "title-add-select-all",  title_add_select_all_cb         },
         { "title-add-clear-all",   title_add_clear_all_cb          },
+        { "title-add-invert",      title_add_invert_cb             },
         { "audio-add",             audio_add_cb                    },
         { "audio-add-all",         audio_add_all_cb                },
         { "audio-reset",           audio_reset_cb                  },
@@ -522,6 +528,7 @@ map_actions (GtkApplication *app, signal_user_data_t *ud)
     set_action_accel(app, "app.source-dir", "<control><shift>o");
     set_action_accel(app, "app.destination", "<control>s");
     set_action_accel(app, "app.add-current", "<alt>a");
+    set_action_accel(app, "app.add-multiple", "<alt>m");
     set_action_accel(app, "app.add-all", "<alt><shift>a");
     set_action_accel(app, "app.queue-start", "<control>e");
     set_action_accel(app, "app.queue-pause", "<control>p");
@@ -582,20 +589,60 @@ static gboolean
 video_file_drop_received (GtkDropTarget* self, const GValue* value,
                           double x, double y, signal_user_data_t *ud)
 {
+/* The GdkFileList method is preferred where supported as it handles multiple
+ * files and also allows access to sandboxed files via the portal */
+#if GTK_CHECK_VERSION(4, 6, 0)
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+    if (G_VALUE_HOLDS(value, GDK_TYPE_FILE_LIST))
+    {
+        GdkFileList *gdk_file_list = g_value_get_boxed(value);
+        GSList *slist = gdk_file_list_get_files(gdk_file_list);
+        g_autoptr(GListStore) video_files = g_list_store_new(G_TYPE_FILE);
+        g_autoptr(GListStore) subtitle_files = g_list_store_new(G_TYPE_FILE);
+        const char *filename = NULL;
+
+        while (slist)
+        {
+            filename = g_file_peek_path(slist->data);
+            if (ghb_file_is_subtitle(filename))
+            {
+                g_debug("Subtitle file dropped on window: %s", filename);
+                g_list_store_append(subtitle_files, slist->data);
+            }
+            else
+            {
+                g_debug("Video file dropped on window: %s", filename);
+                g_list_store_append(video_files, slist->data);
+            }
+            slist = slist->next;
+        }
+
+        if (g_list_model_get_n_items(G_LIST_MODEL(video_files)))
+        {
+            ghb_dict_set_string(ud->prefs, "default_source", filename);
+            ghb_pref_save(ud->prefs, "default_source");
+            ghb_dvd_set_current(filename, ud);
+            ghb_do_scan_list(ud, G_LIST_MODEL(video_files), 0, TRUE);
+        }
+        else if (subtitle_files)
+        {
+            ghb_add_subtitle_files(G_LIST_MODEL(subtitle_files), ud);
+        }
+        return TRUE;
+    }
+G_GNUC_END_IGNORE_DEPRECATIONS
+#endif
+
     g_autoptr(GFile) file = NULL;
     g_autofree gchar *filename = NULL;
 
-    if (G_VALUE_HOLDS(value, G_TYPE_URI))
-    {
-        file = g_file_new_for_uri(g_value_get_string(value));
-    }
-    else if (G_VALUE_HOLDS(value, G_TYPE_STRING))
-    {
-        file = g_file_new_for_path(g_value_get_string(value));
-    }
-    else if (G_VALUE_HOLDS(value, G_TYPE_FILE))
+    if (G_VALUE_HOLDS(value, G_TYPE_FILE))
     {
         file = g_value_dup_object(value);
+    }
+    else if (G_VALUE_HOLDS(value, G_TYPE_URI))
+    {
+        file = g_file_new_for_uri(g_value_get_string(value));
     }
     else
     {
@@ -621,9 +668,11 @@ video_file_drop_init (signal_user_data_t *ud)
 {
     GtkWidget *window = ghb_builder_widget("hb_window");
     GType types[] = {
-        G_TYPE_URI,
-        G_TYPE_STRING,
+#if GTK_CHECK_VERSION(4, 6, 0)
+        GDK_TYPE_FILE_LIST,
+#endif
         G_TYPE_FILE,
+        G_TYPE_URI,
     };
     GtkDropTarget *target = gtk_drop_target_new(G_TYPE_INVALID, GDK_ACTION_COPY);
     gtk_drop_target_set_gtypes(target, types, G_N_ELEMENTS(types));
@@ -792,8 +841,8 @@ ghb_application_activate (GApplication *app)
     // Set up UI combo boxes.  Some of these rely on HB global settings.
     ghb_combo_init(ud);
 
-    g_debug("ud %p", ud);
-    g_debug("builder %p", self->builder);
+    g_debug("ud %p", (void *)ud);
+    g_debug("builder %p", (void *)self->builder);
 
     bind_audio_tree_model(ud);
     bind_subtitle_tree_model(ud);
@@ -884,6 +933,8 @@ static GOptionEntry option_entries[] =
     { "debug",  'x', 0, G_OPTION_ARG_NONE, NULL, N_("Spam a lot"), NULL },
     { "config", 'o', 0, G_OPTION_ARG_STRING, NULL, N_("The path to override user config dir"), "DIR" },
     { "console",'c', 0, G_OPTION_ARG_NONE, NULL, N_("Write debug output to console instead of capturing it"), NULL },
+    { "auto-start-queue", 0, 0, G_OPTION_ARG_NONE, &auto_start_queue, N_("Automatically start the queue"), NULL },
+    { "clear-queue", 0, 0, G_OPTION_ARG_NONE, &clear_queue, N_("Clear previous items from the queue"), NULL },
     { NULL }
 };
 
@@ -989,7 +1040,6 @@ ghb_application_shutdown (GApplication *app)
 
     g_free(ud->current_dvd_device);
     g_free(self->ud);
-    g_free(self->scan_source);
 
     G_APPLICATION_CLASS(ghb_application_parent_class)->shutdown(app);
 }
@@ -1128,9 +1178,10 @@ const char *
 ghb_get_scan_source (void)
 {
     GhbApplication *app = GHB_APPLICATION_DEFAULT;
-    g_return_val_if_fail(GHB_IS_APPLICATION(app), g_strdup(""));
+    g_return_val_if_fail(GHB_IS_APPLICATION(app), "");
+    g_return_val_if_fail(app->ud != NULL, "");
 
-    return app->scan_source;
+    return ghb_dict_get_string(app->ud->settings, "source");
 
 }
 
@@ -1139,11 +1190,19 @@ ghb_set_scan_source (const char *source)
 {
     GhbApplication *app = GHB_APPLICATION_DEFAULT;
     g_return_if_fail(GHB_IS_APPLICATION(app));
+    g_return_if_fail(app->ud != NULL);
 
-    g_free(app->scan_source);
-    if (source)
-        app->scan_source = g_strdup(source);
-    else
-        app->scan_source = g_strdup("");
+    ghb_dict_set_string(app->ud->settings, "source", source);
 }
 
+gboolean
+ghb_get_load_queue (void)
+{
+    return !clear_queue;
+}
+
+gboolean
+ghb_get_auto_start_queue (void)
+{
+    return auto_start_queue;
+}

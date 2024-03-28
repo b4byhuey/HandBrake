@@ -22,12 +22,12 @@
 #include "application.h"
 #include "audiohandler.h"
 #include "callbacks.h"
-#include "compat.h"
 #include "handbrake/handbrake.h"
 #include "handbrake/lang.h"
 #include "hb-backend.h"
 #include "resources.h"
 #include "subtitlehandler.h"
+#include "util.h"
 #include "videohandler.h"
 
 #include <fcntl.h>
@@ -713,7 +713,7 @@ ghb_select_default_preset(signal_user_data_t *ud)
 }
 
 gchar *
-ghb_get_user_config_dir(gchar *subdir)
+ghb_get_user_config_dir (const char *subdir)
 {
     const gchar * dir, * ghb = "ghb";
     gchar       * config;
@@ -1149,6 +1149,14 @@ ghb_prefs_load(signal_user_data_t *ud)
         g_free(source);
 #endif
         store_prefs();
+    }
+    // Migrate from legacy preferences
+    if (ghb_dict_get_int(dict, "DiskFreeLimit"))
+    {
+        int limit_gb = ghb_dict_get_int(dict, "DiskFreeLimit") / 1000;
+        if (limit_gb <= 0) limit_gb = 1;
+        ghb_dict_set_int(dict, "DiskFreeLimitGB", limit_gb);
+        ghb_dict_remove(dict, "DiskFreeLimit");
     }
     ghb_dict_remove(dict, "show_presets");
 }
@@ -1905,7 +1913,7 @@ store_prefs(void)
         if (source != NULL)
             g_source_destroy(source);
     }
-    prefs_timeout_id = g_timeout_add_seconds(1, (GSourceFunc)delayed_store_prefs, NULL);
+    prefs_timeout_id = g_timeout_add(100, (GSourceFunc)delayed_store_prefs, NULL);
 }
 
 void
@@ -2109,10 +2117,10 @@ preset_import_action_cb(GSimpleAction *action, GVariant *param,
                 _("_Open"),
                 _("_Cancel"));
 
-    ghb_add_file_filter(GTK_FILE_CHOOSER(chooser), ud, _("All Files"), "FilterAll");
-    filter = ghb_add_file_filter(GTK_FILE_CHOOSER(chooser), ud, _("Presets (*.json)"), "FilterJSON");
+    ghb_add_file_filter(GTK_FILE_CHOOSER(chooser), _("All Files"), "FilterAll");
+    filter = ghb_add_file_filter(GTK_FILE_CHOOSER(chooser), _("Presets (*.json)"), "FilterJSON");
     gtk_file_chooser_set_filter(GTK_FILE_CHOOSER(chooser), filter);
-    ghb_add_file_filter(GTK_FILE_CHOOSER(chooser), ud, _("Legacy Presets (*.plist)"), "FilterPlist");
+    ghb_add_file_filter(GTK_FILE_CHOOSER(chooser), _("Legacy Presets (*.plist)"), "FilterPlist");
 
     exportDir = ghb_dict_get_string(ud->prefs, "ExportDirectory");
     if (exportDir == NULL || exportDir[0] == '\0')
@@ -3099,7 +3107,6 @@ preset_default_action_cb(GSimpleAction *action, GVariant *param,
             ghb_dict_set_bool(dict, "Default", 1);
             presets_list_show_default(ud);
             store_presets();
-            GSimpleAction *action = GHB_APPLICATION_ACTION("preset-default");
             g_simple_action_set_enabled(action, FALSE);
         }
         g_free(path);
