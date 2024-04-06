@@ -100,7 +100,7 @@
 
 + (NSSet<NSString *> *)keyPathsForValuesAffectingTurboMultiPassSupported
 {
-    return [NSSet setWithObjects:@"encoder", nil];
+    return [NSSet setWithObjects:@"encoder", @"qualityType", nil];
 }
 
 - (BOOL)turboMultiPassSupported
@@ -111,12 +111,12 @@
 
 + (NSSet<NSString *> *)keyPathsForValuesAffectingMultiPassSupported
 {
-    return [NSSet setWithObjects:@"encoder", nil];
+    return [NSSet setWithObjects:@"encoder", @"qualityType", nil];
 }
 
 - (BOOL)multiPassSupported
 {
-    return hb_video_multipass_is_supported(self.encoder);
+    return hb_video_multipass_is_supported(self.encoder, self.qualityType != 0);
 }
 
 + (NSSet<NSString *> *)keyPathsForValuesAffectingConstantQualityLabel
