@@ -3564,7 +3564,24 @@ static int foreign_audio_scan(char **subtracks)
         int ii;
         for (ii = 0; ii < count; ii++)
         {
-            if (!strcasecmp(subtracks[0], "scan"))
+            if (!strcasecmp(subtracks[ii], "scan"))
+            {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+static int subtitles_none(char **subtracks)
+{
+    if (subtracks != NULL)
+    {
+        int count = hb_str_vlen(subtracks);
+        int ii;
+        for (ii = 0; ii < count; ii++)
+        {
+            if (!strcasecmp(subtracks[0], "none"))
             {
                 return 1;
             }
@@ -3784,6 +3801,10 @@ static hb_dict_t * PreparePreset(const char *preset_name)
         hb_dict_set(preset, "SubtitleAddForeignAudioSubtitle",
                     hb_value_bool(1));
     }
+    if (hb_str_vlen(subtracks) > 0)
+    {
+        hb_dict_set(preset, "SubtitleAddForeignAudioSearch", hb_value_bool(0));
+    }
     if (foreign_audio_scan(subtracks))
     {
         // Add foreign audio search
@@ -3827,7 +3848,7 @@ static hb_dict_t * PreparePreset(const char *preset_name)
     {
         selection = subtitle_all == 1 ? "all" : "first";
     }
-    else if (subtitle_track_count > 0)
+    else if (subtitle_track_count > 0 || subtitles_none(subtracks))
     {
         selection = "none";
     }
