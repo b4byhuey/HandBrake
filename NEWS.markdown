@@ -79,6 +79,7 @@ Windows users, please make sure to install [Microsoft .NET Desktop Runtime versi
 - Update the "Open Source" button to make the folder/batch mode more discoverable. 
 - Refreshed app icons
 - Miscellaneous bug fixes and improvements
+- Updated existing translations
 
 ### Mac
 
@@ -104,6 +105,7 @@ Windows users, please make sure to install [Microsoft .NET Desktop Runtime versi
 - Added Invert Queue option to the Add to Queue Window (#5741)
 - Drag/Drop now supports resursive folder scan mode.
 - Miscellaneous bug fixes and improvements
+- Updated existing translations
 - Added new translations
   - Catalan (Català)
 
