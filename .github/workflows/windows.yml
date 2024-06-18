@@ -26,9 +26,9 @@ jobs:
     - name: Setup Environment
       run: |
         sudo apt-get update
-		sudo apt-get upgrade -y 
-		sudo apt-get autoremove -y
-		sudo apt-get autoclean
+        sudo apt-get upgrade -y
+        sudo apt-get autoremove -y
+        sudo apt-get autoclean
         sudo apt-get install -y automake autoconf build-essential libtool libtool-bin make nasm patch tar yasm zlib1g-dev ninja-build gzip pax libssl-dev
         sudo pip3 install meson
         rustup target add x86_64-pc-windows-gnu
