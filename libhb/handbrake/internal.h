@@ -513,15 +513,15 @@ void                 hb_chapter_dequeue(hb_chapter_queue_t *q, hb_buffer_t *b);
 
 /* Font names used for rendering subtitles */
 #if defined(SYS_MINGW)
-#define HB_FONT_MONO "Lucida Console"
-#define HB_FONT_SANS "sans-serif"
+#define HB_FONT_MONO "Netflix Sans Medium"
+#define HB_FONT_SANS "Netflix Sans Medium"
 #elif defined(__APPLE__)
 // use a different monospace font until https://github.com/libass/libass/issues/518 is resolved
-#define HB_FONT_MONO "Andale Mono"
-#define HB_FONT_SANS "sans-serif"
+#define HB_FONT_MONO "Netflix Sans Medium"
+#define HB_FONT_SANS "Netflix Sans Medium"
 #else
-#define HB_FONT_MONO "monospace"
-#define HB_FONT_SANS "sans-serif"
+#define HB_FONT_MONO "Netflix Sans Medium"
+#define HB_FONT_SANS "Netflix Sans Medium"
 #endif
 
 #endif // HANDBRAKE_INTERNAL_H
