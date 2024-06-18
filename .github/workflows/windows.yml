@@ -25,7 +25,11 @@ jobs:
 
     - name: Setup Environment
       run: |
-        sudo apt-get install automake autoconf build-essential libtool libtool-bin make nasm patch tar yasm zlib1g-dev ninja-build gzip pax libssl-dev
+        sudo apt-get update
+		sudo apt-get upgrade -y 
+		sudo apt-get autoremove -y
+		sudo apt-get autoclean
+        sudo apt-get install -y automake autoconf build-essential libtool libtool-bin make nasm patch tar yasm zlib1g-dev ninja-build gzip pax libssl-dev
         sudo pip3 install meson
         rustup target add x86_64-pc-windows-gnu
 
@@ -34,8 +38,8 @@ jobs:
         wget https://github.com/bradleysepos/mingw-w64-build/releases/download/10.0.0/mingw-w64-toolchain-10.0.0-msvcrt-linux-x86_64.tar.gz
         SHA=$(sha1sum mingw-w64-toolchain-10.0.0-msvcrt-linux-x86_64.tar.gz)
         EXPECTED="f7250d140a72bdfdda2d4cd01d84e9a3938132b1  mingw-w64-toolchain-10.0.0-msvcrt-linux-x86_64.tar.gz"
-        if [ "$SHA" == "$EXPECTED" ];
-        then
+        echo "Computed SHA: $SHA"
+        if [ "$SHA" == "$EXPECTED" ]; then
             echo "Toolchain Verified. Extracting ..."
             mkdir toolchains
             mv mingw-w64-toolchain-10.0.0-msvcrt-linux-x86_64.tar.gz toolchains
@@ -45,7 +49,7 @@ jobs:
             pwd
         else
             echo "Toolchain Verification FAILED. Exiting!"
-            return -1
+            exit 2
         fi
 
     - name: Setup Cargo-C Toolchain
@@ -55,19 +59,43 @@ jobs:
 
     - name: Build CLI and LibHB
       run: |
+        set -e  # Exit immediately if a command exits with a non-zero status
+        echo "Setting PATH for the toolchain"
         export PATH="/home/runner/work/HandBrake/HandBrake/toolchains/mingw-w64-toolchain-10.0.0-msvcrt-linux-x86_64/mingw-w64-x86_64/bin:${PATH}"
         export PATH=/usr/bin:$PATH
-        ./configure --cross=x86_64-w64-mingw32 --enable-qsv --enable-vce --enable-nvenc --enable-nvdec --launch-jobs=0 --launch
-        cd build
-        make pkg.create.zip
+        
+        echo "Configuring the build"
+        ./configure --cross=x86_64-w64-mingw32 --enable-qsv --enable-vce --enable-nvenc --enable-nvdec --enable-fdk-aac --launch-jobs=0 --launch > configure.log 2>&1 || { echo "Configuration failed"; cat configure.log; exit 1; }
+
+        echo "Entering build directory"
+        cd build || { echo "Failed to change directory to build"; exit 1; }
+        
+        echo "Starting the build process"
+        make pkg.create.zip > build.log 2>&1 || { echo "Build process failed"; cat build.log; exit 1; }
+
+    - name: Upload Configure Log
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: configure-log
+        path: configure.log
+
+    - name: Upload Build Log
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log
+        path: build/build.log
 
     - name: Upload HandBrakeCLI
+      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: HandBrakeCLI
         path: ./build/HandBrakeCLI.exe
 
     - name: Upload LibHB
+      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: LibHandBrake
@@ -106,14 +134,71 @@ jobs:
         $env:Path += ";C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin"
         msbuild win\cs\build.xml /t:x64 /p:PfxFile=$env:SigningCertificate /p:PfxPwd=${{ secrets.HandBrakeTeam_pfx_pwd }} /p:SignTimestampServer=http://time.certum.pl/
 
+    - name:  Prepare Package
+      run: |
+        echo "Creating Portable Zip"
+        cd win/CS/HandBrakeWPF/bin/publish/
+        ren portable.ini.template portable.ini
+        dir
+        cd ..
+        dir
+        rmdir /q /s Debug   
+        move publish HandBrake
+        dir             
+        7z a HandBrake-Nightly-x86_64-Win_Portable.zip * -x!HandBrake\HandBrake-Nightly-x86_64-Win_GUI.exe -x!HandBrake\*.nsi -x!HandBrake\*.config -x!*HandBrake\*.xml -x!*HandBrake\*.pdb -x!*HandBrake\*.bmp  -x!HandBrake\*.zip -x!HandBrake\*.bz2 -x!HandBrake\*.msi -x!HandBrake\*.json -mx9
+      shell: cmd    
+
     - name: Upload HandBrake exe Installer
       uses: actions/upload-artifact@v4
       with:
         name: HandBrake-x86_64-Win_GUI-EXE
-        path: win/CS/HandBrakeWPF/bin/publish/HandBrake-Nightly-x86_64-Win_GUI.exe
-
-    - name: Upload HandBrake msi Installer
+        path: win/CS/HandBrakeWPF/bin/HandBrake/HandBrake-Nightly-x86_64-Win_GUI.exe
+        
+    - name: Upload HandBrake Portable
       uses: actions/upload-artifact@v4
       with:
-        name:  HandBrake-x86_64-Win_GUI-MSI
-        path: win/CS/HandBrakeWPF/bin/publish/HandBrake-Nightly-x86_64-Win_GUI.msi
+        name:  HandBrake-x86_64-Win_Portable
+        path: win/CS/HandBrakeWPF/bin/HandBrake-Nightly-x86_64-Win_Portable.zip
+    
+  deploy_nightly:
+    name: Deploy Nightly Build
+    runs-on: ubuntu-latest
+    needs: [build_mingw, build_gui]
+    steps:
+    - uses: actions/checkout@v4.1.6
+       
+    - name: Download Artifacts - CLI
+      uses: actions/download-artifact@v4
+      with:
+        name: HandBrakeCLI
+        path: win/      
+        
+    - name: Download Artifacts - GUI EXE
+      uses: actions/download-artifact@v4
+      with:
+        name: HandBrake-x86_64-Win_GUI-EXE
+        path: win/
+        
+    - name: Download Artifacts - Portable
+      uses: actions/download-artifact@v4
+      with:
+        name: HandBrake-x86_64-Win_Portable
+        path: win/        
+        
+    - name: Remove the old Release
+      uses: freenet-actions/delete-old-releases@v2
+      with:
+        keep-latest-releases: false
+        delete-tags: "windows"
+        max-age: PT1M
+        token: ${{ secrets.GITHUB_TOKEN }}
+          
+    - uses: ncipollo/release-action@v1.14.0
+      with:
+        artifacts: "win/*.*"
+        name: "Snapshots for Windows"
+        bodyFile: .github/build.md
+        prerelease: false        
+        allowUpdates: false
+        tag: $time_snap
+        token: ${{ secrets.GITHUB_TOKEN }}
