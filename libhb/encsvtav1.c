@@ -502,7 +502,7 @@ static int send(hb_work_object_t *w, hb_buffer_t *in)
                 av_freep(&payload);
             }
             else if (job->passthru_dynamic_hdr_metadata & DOVI &&
-                     side_data->type == AV_FRAME_DATA_DOVI_RPU_BUFFER)
+                     side_data->type == AV_FRAME_DATA_DOVI_RPU_BUFFER_T35)
             {
                 svt_add_metadata(headerPtr, EB_AV1_METADATA_TYPE_ITUT_T35, side_data->data, side_data->size);
             }
@@ -512,7 +512,10 @@ static int send(hb_work_object_t *w, hb_buffer_t *in)
 
     if (in->s.new_chap > 0 && pv->job->chapter_markers)
     {
-        headerPtr->pic_type = EB_AV1_KEY_PICTURE;
+        if (pv->enc_params.force_key_frames)
+        {
+            headerPtr->pic_type = EB_AV1_KEY_PICTURE;
+        }
         hb_chapter_enqueue(pv->chapter_queue, in);
     }
     else

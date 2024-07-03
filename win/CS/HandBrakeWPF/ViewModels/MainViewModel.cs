@@ -506,7 +506,7 @@ namespace HandBrakeWPF.ViewModels
                     this.SelectedPointToPoint = PointToPointMode.Chapters;
                     this.SelectedAngle = 1;
 
-                    this.TriggerAutonameChange(ChangedOption.None);
+                    this.TriggerAutonameChange(ChangedOption.Source);
 
                     this.NotifyOfPropertyChange(() => this.CurrentTask);
 
@@ -818,6 +818,10 @@ namespace HandBrakeWPF.ViewModels
 
         public bool IsPresetDescriptionVisible { get; set; }
 
+        public bool IsLegacyMenuShown { get; set; }
+
+        public string ShowHideMenuText => this.IsLegacyMenuShown ? Resources.MainView_HideClassicMenu : Resources.MainView_ShowClassicMenu;
+
         /* Commands */
 
         public ICommand QueueCommand { get; set; }
@@ -889,6 +893,11 @@ namespace HandBrakeWPF.ViewModels
             this.ChaptersViewModel.TabStatusChanged += this.TabStatusChanged;
             this.MetaDataViewModel.TabStatusChanged += this.TabStatusChanged;
             this.SummaryViewModel.TabStatusChanged += this.TabStatusChanged;
+
+            // Menu State
+            this.IsLegacyMenuShown = this.userSettingService.GetUserSetting<bool>(UserSettingConstants.IsLegacyMenuShown);
+            this.NotifyOfPropertyChange(() => this.IsLegacyMenuShown);
+            this.NotifyOfPropertyChange(() => this.ShowHideMenuText);
         }
 
         public void Shutdown()
@@ -1473,6 +1482,15 @@ namespace HandBrakeWPF.ViewModels
             }
         }
 
+        public void ShowHideMenu()
+        {
+            this.IsLegacyMenuShown = !this.IsLegacyMenuShown;
+            this.NotifyOfPropertyChange(() => this.IsLegacyMenuShown);
+            this.NotifyOfPropertyChange(() => this.ShowHideMenuText);
+
+            this.userSettingService.SetUserSetting(UserSettingConstants.IsLegacyMenuShown, this.IsLegacyMenuShown);
+        }
+
         /* Main Window Public Methods*/
 
         public void FilesDroppedOnWindow(DragEventArgs e)
@@ -1499,16 +1517,6 @@ namespace HandBrakeWPF.ViewModels
                     else if (videoContent.Count >= 1)
                     {
                         this.StartScan(videoContent, 0);
-                        return;
-                    }
-
-                    if (this.SelectedTitle == null)
-                    {
-                        this.errorService.ShowMessageBox(
-                            Resources.MainView_SubtitleBeforeScanError,
-                            Resources.Error,
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Error);
                         return;
                     }
 
@@ -1871,8 +1879,10 @@ namespace HandBrakeWPF.ViewModels
 
                     if (this.userSettingService.GetUserSetting<bool>(UserSettingConstants.AutoNaming))
                     {
-                        if(this.userSettingService.GetUserSetting<string>(UserSettingConstants.AutoNameFormat) != null)
-                            this.ReGenerateAutoName();
+                        if (this.userSettingService.GetUserSetting<string>(UserSettingConstants.AutoNameFormat) != null)
+                        {
+                            this.TriggerAutonameChange(ChangedOption.Preset);
+                        }
                     }
 
                     return true;
@@ -2116,6 +2126,7 @@ namespace HandBrakeWPF.ViewModels
             {
                 return;
             }
+
             //AutoNameFormat Empty will generate chapter name
             if (option != ChangedOption.None && option != ChangedOption.Chapters) 
             {
@@ -2124,22 +2135,30 @@ namespace HandBrakeWPF.ViewModels
                     return;
                 }
             }
-            
-            bool is_execute = false;
 
-            if (option == ChangedOption.None)
+            bool is_execute = false;
+            
+            if ((autonameFormat.Contains(Constants.Source) || autonameFormat.Contains(Constants.SourcePath) || autonameFormat.Contains(Constants.SourceFolderName)) && option == ChangedOption.Source)
             {
                 is_execute = true;
             }
+
             if (option == ChangedOption.Chapters 
                 && this.SelectedPointToPoint == PointToPointMode.Chapters
                 && this.SelectedTitle.SourcePath != null
-                && this.userSettingService.GetUserSetting<string>(UserSettingConstants.AutoNameFormat).Contains(Constants.Chapters)
-                )
+                && autonameFormat.Contains(Constants.Chapters)
+               )
             {
                 is_execute = true;
             }
-            if (autonameFormat.Contains(Constants.QualityBitrate) && (option == ChangedOption.Bitrate || option == ChangedOption.Quality))
+
+            if ((autonameFormat.Contains(Constants.Encoder) || autonameFormat.Contains(Constants.Codec) || autonameFormat.Contains(Constants.EncoderBitDepth)  || autonameFormat.Contains(Constants.EncoderDisplay) ) 
+                && option == ChangedOption.Encoder)
+            {
+                is_execute = true;
+            }
+
+            if ((autonameFormat.Contains(Constants.QualityBitrate) || autonameFormat.Contains(Constants.QualityType)) && (option == ChangedOption.Bitrate || option == ChangedOption.Quality))
             {
                 is_execute = true;
             }
@@ -2149,11 +2168,16 @@ namespace HandBrakeWPF.ViewModels
                 is_execute = true;
             }
 
+            if (autonameFormat.Contains(Constants.Preset) && option == ChangedOption.Preset)
+            {
+                is_execute = true;
+            }
 
             if ((autonameFormat.Contains(Constants.StorageWidth) || autonameFormat.Contains(Constants.StorageHeight)) && option == ChangedOption.Dimensions)
             {
                 is_execute = true;
             }
+
             if (is_execute)
             {
                 this.Destination = AutoNameHelper.AutoName(this.CurrentTask, this.SelectedTitle?.DisplaySourceName, this.SelectedTitle?.DisplaySourceName, this.selectedPreset);

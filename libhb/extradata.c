@@ -80,7 +80,7 @@ int hb_set_ssa_extradata(hb_data_t **extradata, const char *font, int fs, int w,
         "\r\n"
         "[V4+ Styles]\r\n"
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\r\n"
-        "Style: Default,%s,%d,&H00FFFFFF,&H00FFFFFF,&H000F0F0F,&H000F0F0F,0,0,0,0,100,100,0,0.00,1,%s,%s,2,20,20,20,0\r\n";
+        "Style: Default,%s,%d,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0.00,1,%s,%s,2,10,10,20,1\r\n";
 
     header = hb_strdup_printf(ssa_header, w, h, font, fs, outline_size_string, shadow_size_string);
     if (header == NULL)

@@ -750,11 +750,27 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
      }];
 }
 
-- (void)askForPermissionAndSetDestinationURLs:(NSArray<NSURL *> *)destinationURLs
+- (void)askForPermissionAndSetDestinationURLs:(NSArray<NSURL *> *)destinationURLs sourceURLs:(NSArray<NSURL *> *)sourceURLs
 {
     if (destinationURLs.count == 0)
     {
         return;
+    }
+
+    if (sourceURLs.firstObject)
+    {
+        // There is no need to ask for permission
+        // if the source is a already a folder
+        NSNumber *isDirectory = nil;
+        NSURL *sourceURL = sourceURLs.firstObject;
+        [sourceURL getResourceValue:&isDirectory forKey:NSURLIsDirectoryKey error:nil];
+
+        if (isDirectory.boolValue == YES)
+        {
+            self.destinationFolderURL = sourceURL;
+            self.destinationFolderToken = [HBSecurityAccessToken tokenWithObject:sourceURL];
+            return;
+        }
     }
 
     if (![self.destinationFolderURL isEqualTo:destinationURLs.firstObject])
@@ -837,7 +853,7 @@ static void *HBControllerLogLevelContext = &HBControllerLogLevelContext;
                 self.job = job;
                 if (featuredTitle.isStream && [NSUserDefaults.standardUserDefaults boolForKey:HBUseSourceFolderDestination])
                 {
-                    [self askForPermissionAndSetDestinationURLs:baseURLs];
+                    [self askForPermissionAndSetDestinationURLs:baseURLs sourceURLs:fileURLs];
                 }
             }
             else
@@ -1784,7 +1800,16 @@ static NSTouchBarItemIdentifier HBTouchBarActivity = @"fr.handbrake.activity";
         NSCustomTouchBarItem *item = [[NSCustomTouchBarItem alloc] initWithIdentifier:identifier];
         item.customizationLabel = NSLocalizedString(@"Add To Queue", @"Touch bar");
 
-        NSButton *button = [NSButton buttonWithTitle:NSLocalizedString(@"Add To Queue", @"Touch bar") target:self action:@selector(addToQueue:)];
+        NSButton *button = nil;
+        if (@available (macOS 11, *))
+        {
+            NSImage *image = [NSImage imageNamed:@"photo.badge.plus"];
+            button = [NSButton buttonWithImage:image target:self action:@selector(addToQueue:)];
+        }
+        else
+        {
+            button = [NSButton buttonWithTitle:NSLocalizedString(@"Add To Queue", @"Touch bar") target:self action:@selector(addToQueue:)];
+        }
 
         item.view = button;
         return item;
@@ -1834,7 +1859,17 @@ static NSTouchBarItemIdentifier HBTouchBarActivity = @"fr.handbrake.activity";
         NSCustomTouchBarItem *item = [[NSCustomTouchBarItem alloc] initWithIdentifier:identifier];
         item.customizationLabel = NSLocalizedString(@"Show Activity Window", @"Touch bar");
 
-        NSButton *button = [NSButton buttonWithImage:[NSImage imageNamed:NSImageNameTouchBarGetInfoTemplate] target:nil action:@selector(showOutputPanel:)];
+        NSImage *image = nil;
+        if (@available (macOS 11, *))
+        {
+            image = [NSImage imageNamed:@"text.viewfinder"];
+        }
+        else
+        {
+            image = [NSImage imageNamed:NSImageNameTouchBarPlayTemplate];
+        }
+
+        NSButton *button = [NSButton buttonWithImage:image target:nil action:@selector(showOutputPanel:)];
 
         item.view = button;
         return item;

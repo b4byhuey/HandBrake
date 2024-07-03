@@ -8,6 +8,42 @@ Before updating HandBrake, please make sure there are no pending encodes in the 
 Windows users, please make sure to install [Microsoft .NET Desktop Runtime version 8.0.x](https://dotnet.microsoft.com/en-us/download/dotnet/8.0). Read carefully: you need the **DESKTOP** runtime.
 
 
+## HandBrake 1.8.1
+
+### All platforms
+
+#### Video
+
+- Fixed a warning / misconfiguration when repeat-headers is used with the x265 encoder.(#6061)
+- Fixed an issue where the NVEnc encoder ignored the level option
+
+#### Subtitles
+
+- Fixed an issue where dvd subtitles could be corrupted during rendering.
+
+#### Filters
+
+- Fixed an issue that caused video artefacts to occur when using the eedi2 filter (#6073)
+
+#### Third-party libraries
+
+- Updated libraries
+  - FFmpeg 7.0.1 (decoding and filters)
+  - libdav1d 1.4.3 (AV1 video decoding)
+
+### Mac
+
+- Fixed a stall in the queue that could happen if the encoding process crashes when configuring a job
+- Removed the "Show" button from the notifications when there is nothing to show
+
+### Windows
+
+- Hardware decoding is now defaulted to off for new installations. Users can opt-in whilst making sure they are running up-to-date drivers
+- Fixed an issue where hardware decoding could erroneously be used for previews
+- Fixed an issue where auto name was triggering too aggressively (#6079)
+- Removed an erroneous error message when dragging files onto the main window that include a subtitle file.(#6065)
+
+
 ## HandBrake 1.8.0
 
 ### All platforms
@@ -58,15 +94,17 @@ Windows users, please make sure to install [Microsoft .NET Desktop Runtime versi
   - AMF 1.4.33 (AMD VCN video encoding)
   - FFmpeg 7.0 (decoding and filters)
   - HarfBuzz 8.4.0 (subtitles)
+  - libass 0.17.2 (subtitles)
   - libdav1d 1.4.1 (AV1 video decoding)
   - libdovi 3.3.0 (Dolby Vision dynamic metadata)
   - libopus 1.5.2 (Opus audio encoding)
-  - libjpeg-turbo 3.0.2 (preview image compression)
+  - libjpeg-turbo 3.0.3 (preview image compression)
   - libvpx 1.14.0 (VP8/VP9 video encoding)
   - oneVPL 2.10.1 (Intel QSV video encoding/decoding)
-  - SVT-AV1 2.0 (AV1 video encoding)
+  - SVT-AV1 2.1.0 (AV1 video encoding)
   - x264 164 r3186 (H.264/AVC video encoding)
   - x265 3.6 (H.265/HEVC video encoding)
+  - zlib 1.3.1 (general)
 - Removed libraries
   - libxml2
   

@@ -14,6 +14,7 @@ namespace HandBrakeWPF.Services.Queue
     using System.Collections.ObjectModel;
     using System.IO;
     using System.Linq;
+    using System.Linq.Expressions;
     using System.Text.Json;
     using System.Timers;
     using System.Windows;
@@ -86,7 +87,7 @@ namespace HandBrakeWPF.Services.Queue
             this.allowedInstances = this.userSettingService.GetUserSetting<int>(UserSettingConstants.SimultaneousEncodes);
             this.processIsolationEnabled = this.userSettingService.GetUserSetting<bool>(UserSettingConstants.ProcessIsolationEnabled);
 
-            this.encodeTaskFactory = new EncodeTaskFactory(this.userSettingService);
+            this.encodeTaskFactory = new EncodeTaskFactory(this.userSettingService, true);
 
             this.hardwareResourceManager.Init();
         }
@@ -746,7 +747,7 @@ namespace HandBrakeWPF.Services.Queue
             QueueTask job = this.GetNextJobForProcessing();
             if (job != null)
             {
-                if (job.IsBreakpointTask)
+                if (job.TaskType == QueueTaskType.Breakpoint)
                 {
                     this.HandleBreakPoint(job);
                     return;
@@ -906,7 +907,7 @@ namespace HandBrakeWPF.Services.Queue
 
         private void RemoveBreakPoints()
         {
-            List<QueueTask> tasks = this.queue.Where(t => t.IsBreakpointTask).ToList();
+            List<QueueTask> tasks = this.queue.Where(t => t.TaskType == QueueTaskType.Breakpoint).ToList();
             foreach (var task in tasks)
             {
                 this.queue.Remove(task);

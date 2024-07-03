@@ -176,7 +176,7 @@ namespace HandBrakeWPF.Services.Scan
             BitmapImage bitmapImage = null;
             try
             {
-                EncodeTaskFactory factory = new EncodeTaskFactory(this.userSettingService);
+                EncodeTaskFactory factory = new EncodeTaskFactory(this.userSettingService, false);
                 JsonEncodeObject jobDict = factory.Create(job);
                 RawPreviewData bitmapData = this.instance.GetPreview(jobDict, preview);
                 if (bitmapData != null)
@@ -229,7 +229,7 @@ namespace HandBrakeWPF.Services.Scan
 
                 bool nvdec = this.userSettingService.GetUserSetting<bool>(UserSettingConstants.EnableNvDecSupport);
                 int hwDecode = 0;
-                if (nvdec)
+                if (nvdec && HandBrakeHardwareEncoderHelper.IsNVDecAvailable)
                 {
                     hwDecode = (int)NativeConstants.HB_DECODE_SUPPORT_NVDEC;
                 }
