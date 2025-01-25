@@ -1,6 +1,6 @@
 /* common.h
 
-   Copyright (c) 2003-2024 HandBrake Team
+   Copyright (c) 2003-2025 HandBrake Team
    This file is part of the HandBrake source code
    Homepage: <http://handbrake.fr/>.
    It may be used under the terms of the GNU General Public License v2.
@@ -1616,9 +1616,12 @@ struct hb_blend_object_s
     char                * name;
 
 #ifdef __LIBHB__
-    int                (* init)       ( hb_blend_object_t *, int in_pix_fmt, int in_chroma_location, int sub_pix_fmt );
+    int                (* init)       ( hb_blend_object_t *, int in_width, int in_height,
+                                        int in_pix_fmt, int in_chroma_location,
+                                        int in_color_range, int overlay_pix_fmt );
     hb_buffer_t *      (* work)       ( hb_blend_object_t *,
-                                        hb_buffer_t *, hb_buffer_list_t * );
+                                        hb_buffer_t *, hb_buffer_list_t *,
+                                        int changed );
     void               (* close)      ( hb_blend_object_t * );
 
     hb_blend_private_t * private_data;
