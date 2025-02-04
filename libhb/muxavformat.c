@@ -58,6 +58,7 @@ enum
 {
     META_HB,
     META_MUX_MP4,
+    META_MUX_MOV,
     META_MUX_MKV,
     META_MUX_WEBM,
     META_MUX_LAST
@@ -65,16 +66,16 @@ enum
 
 const char *metadata_keys[][META_MUX_LAST] =
 {
-    {"Name",            "title",        "TITLE"},
-    {"Artist",          "artist",       "ARTIST"},
-    {"AlbumArtist",     "album_artist", "DIRECTOR"},
-    {"Composer",        "composer",     "COMPOSER"},
-    {"ReleaseDate",     "date",         "DATE_RELEASED"},
-    {"Comment",         "comment",      "SUMMARY"},
-    {"Album",           "album",        NULL},
-    {"Genre",           "genre",        "GENRE"},
-    {"Description",     "description",  "DESCRIPTION"},
-    {"LongDescription", "synopsis",     "SYNOPSIS"},
+    {"Name",            "title",        "com.apple.quicktime.displayname",  "TITLE"},
+    {"Artist",          "artist",       "com.apple.quicktime.artist",       "ARTIST"},
+    {"AlbumArtist",     "album_artist", NULL,                               "DIRECTOR"},
+    {"Composer",        "composer",     "com.apple.quicktime.composer",     "COMPOSER"},
+    {"ReleaseDate",     "date",         "com.apple.quicktime.creationdate", "DATE_RELEASED"},
+    {"Comment",         "comment",      "com.apple.quicktime.comment",      "SUMMARY"},
+    {"Album",           "album",        "com.apple.quicktime.album",        NULL},
+    {"Genre",           "genre",        "com.apple.quicktime.genre",        "GENRE"},
+    {"Description",     "description",  "com.apple.quicktime.description",  "DESCRIPTION"},
+    {"LongDescription", "synopsis",     NULL,                               "SYNOPSIS"},
     {NULL}
 };
 
@@ -1069,17 +1070,36 @@ static int avformatInit( hb_mux_object_t * m )
                 }
             }
         }
+
+        if (job->mux == HB_MUX_AV_MP4)
+        {
+            // Many software can only read the mvhd creation date field
+            // and use it incorrectly as the date the video was recorded
+            hb_value_t *val = hb_dict_get(job->metadata->dict, "ReleaseDate");
+            if (val != NULL)
+            {
+                const char *str = hb_value_get_string(val);
+                if (str != NULL)
+                {
+                    av_dict_set(&m->oc->metadata, "creation_time", str, 0);
+                }
+            }
+        }
+    }
+
+    if (av_dict_get(m->oc->metadata, "creation_time", NULL, 0) == NULL)
+    {
+        time_t now = time(NULL);
+        struct tm *now_utc = gmtime(&now);
+        char now_8601[24];
+        strftime(now_8601, sizeof(now_8601), "%Y-%m-%dT%H:%M:%SZ", now_utc);
+        av_dict_set(&m->oc->metadata, "creation_time", now_8601, 0);
     }
 
     char tool_string[80];
     snprintf(tool_string, sizeof(tool_string), "HandBrake %s %i",
              HB_PROJECT_VERSION, HB_PROJECT_BUILD);
     av_dict_set(&m->oc->metadata, "encoding_tool", tool_string, 0);
-    time_t now = time(NULL);
-    struct tm * now_utc = gmtime(&now);
-    char now_8601[24];
-    strftime(now_8601, sizeof(now_8601), "%Y-%m-%dT%H:%M:%SZ", now_utc);
-    av_dict_set(&m->oc->metadata, "creation_time", now_8601, 0);
 
     ret = avformat_write_header(m->oc, &av_opts);
     if( ret < 0 )
