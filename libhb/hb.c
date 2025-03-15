@@ -483,6 +483,19 @@ hb_title_set_t * hb_get_title_set( hb_handle_t * h )
     return &h->title_set;
 }
 
+hb_list_t * hb_get_title_coverarts( hb_handle_t * h, int title )
+{
+    hb_title_t * sourceTitle = hb_list_item(h->title_set.list_title, title);
+    if (sourceTitle) 
+    {
+        hb_list_t * coverart = sourceTitle->metadata->list_coverart;
+        return coverart;
+    }
+    
+    hb_list_t * emptyList = hb_list_init();
+    return emptyList;
+}
+
 int hb_save_preview( hb_handle_t * h, int title, int preview, hb_buffer_t *buf, int format )
 {
     FILE    * file;
@@ -2163,12 +2176,6 @@ int hb_global_init()
     hb_register(&hb_encx265);
 #endif
     hb_register(&hb_encsvtav1);
-#if HB_PROJECT_FEATURE_QSV
-    if (!disable_hardware)
-    {
-        hb_register(&hb_encqsv);
-    }
-#endif
 
     hb_x264_global_init();
     hb_common_global_init(disable_hardware);
