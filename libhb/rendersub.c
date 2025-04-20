@@ -754,8 +754,8 @@ static int ssa_post_init(hb_filter_object_t *filter, hb_job_t *job)
     // Setup default font family
     //
     // SSA v4.00 requires that "Arial" be the default font
-    const char *font = NULL;
-    const char *family = "Netflix Sans Medium";
+    const char *font = "Netflix Sans Medium";
+    const char *family = "Netflix Sans";
     // NOTE: This can sometimes block for several *seconds*.
     //       It seems that process_fontdata() for some embedded fonts is slow.
     ass_set_fonts(pv->renderer, font, family, /*haveFontConfig=*/1, NULL, 1);
