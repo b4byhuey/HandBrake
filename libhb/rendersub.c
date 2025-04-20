@@ -10,7 +10,6 @@
 #include "handbrake/handbrake.h"
 #include "handbrake/hbffmpeg.h"
 #include "handbrake/extradata.h"
-#include <stdio.h>
 #include <ass/ass.h>
 
 #define ABS(a) ((a) > 0 ? (a) : (-(a)))
@@ -755,38 +754,11 @@ static int ssa_post_init(hb_filter_object_t *filter, hb_job_t *job)
     // Setup default font family
     //
     // SSA v4.00 requires that "Arial" be the default font
-    const char *font = "Netflix Sans Medium";
-    const char *family = "Netflix Sans Medium";
+    const char *font = NULL;
+    const char *family = "Arial";
     // NOTE: This can sometimes block for several *seconds*.
     //       It seems that process_fontdata() for some embedded fonts is slow.
-    ass_set_fonts(pv->renderer, font, family, /*haveFontConfig=*/0, NULL, 1);
-    // Register NetflixSansMedium.ttf from file
-   FILE *f = fopen("NetflixSansMedium.ttf", "rb");
-   if (f)
-   {
-       fseek(f, 0, SEEK_END);
-       long fsize = ftell(f);
-       fseek(f, 0, SEEK_SET);
-
-       void *fontdata = malloc(fsize);
-       if (fontdata != NULL)
-       {
-           fread(fontdata, 1, fsize, f);
-           fclose(f);
-
-           ass_add_font(pv->ssa, "NetflixSansMedium.ttf", fontdata, fsize);
-           free(fontdata);
-       }
-       else
-       {
-           fclose(f);
-           hb_log("Failed to allocate memory for NetflixSansMedium.ttf");
-       }
-   }
-   else
-   {
-       hb_log("Failed to open NetflixSansMedium.ttf");
-   }
+    ass_set_fonts(pv->renderer, font, family, /*haveFontConfig=*/1, NULL, 1);
 
     // Setup track state
     pv->ssa_track = ass_new_track(pv->ssa);
