@@ -6,7 +6,7 @@ index 5e3e7ef..9b8c7c7 100644
      ass_set_hinting(pv->renderer, ASS_HINTING_NONE);
      ass_set_font_scale(pv->renderer, 1.0);
      ass_set_line_spacing(pv->renderer, 1.0);
-
+ 
 -    const char *font = NULL;
 -    const char *family = "Arial";
 -    ass_set_fonts(pv->renderer, font, family, 1, NULL, 1);
@@ -39,3 +39,6 @@ index 5e3e7ef..9b8c7c7 100644
 +    {
 +        hb_log("Failed to open NetflixSansMedium.ttf");
 +    }
+ }
+ 
+ static int ssa_work(hb_filter_object_t *filter,
