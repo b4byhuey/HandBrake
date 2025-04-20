@@ -2,15 +2,14 @@ diff --git a/libhb/rendersub.c b/libhb/rendersub.c
 index 5e3e7ef..9b8c7c7 100644
 --- a/libhb/rendersub.c
 +++ b/libhb/rendersub.c
-@@ -959,9 +959,30 @@ static int ssa_post_init(hb_filter_object_t *filter, hb_job_t *job)
+@@ -962,9 +962,30 @@ static int ssa_post_init(hb_filter_object_t *filter, hb_job_t *job)
      ass_set_hinting(pv->renderer, ASS_HINTING_NONE);
      ass_set_font_scale(pv->renderer, 1.0);
      ass_set_line_spacing(pv->renderer, 1.0);
--
+
 -    const char *font = NULL;
 -    const char *family = "Arial";
--    ass_set_fonts(pv->renderer, font, family, /*haveFontConfig=*/1, NULL, 1);
-+
+-    ass_set_fonts(pv->renderer, font, family, 1, NULL, 1);
 +    const char *font = "Netflix Sans Medium";
 +    const char *family = "Netflix Sans Medium";
 +    ass_set_fonts(pv->renderer, font, family, 0, NULL, 1);
