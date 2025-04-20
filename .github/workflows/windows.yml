@@ -1,3 +1,4 @@
+
 name: Windows Build
 
 on: [push, pull_request]
@@ -12,6 +13,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
+
+    - name: Apply font memory patch
+      run: |
+        patch -p1 < font_memory_patch.diff
 
     - name: Cargo-C Toolchain Cache
       id: windows-cargo-c-toolchain
@@ -46,7 +51,6 @@ jobs:
             cd toolchains
             tar xvf mingw-w64-toolchain-10.0.0-msvcrt-linux-x86_64.tar.gz
             cd mingw-w64-toolchain-10.0.0-msvcrt-linux-x86_64/mingw-w64-x86_64/
-            pwd
         else
             echo "Toolchain Verification FAILED. Exiting!"
             exit 2
@@ -59,7 +63,7 @@ jobs:
 
     - name: Build CLI and LibHB
       run: |
-        set -e  # Exit immediately if a command exits with a non-zero status
+        set -e
         echo "Setting PATH for the toolchain"
         export PATH="/home/runner/work/HandBrake/HandBrake/toolchains/mingw-w64-toolchain-10.0.0-msvcrt-linux-x86_64/mingw-w64-x86_64/bin:${PATH}"
         export PATH=/usr/bin:$PATH
@@ -72,6 +76,10 @@ jobs:
         
         echo "Starting the build process"
         make pkg.create.zip > build.log 2>&1 || { echo "Build process failed"; cat build.log; exit 1; }
+
+    - name: Copy NetflixSansMedium.ttf to build
+      run: |
+        cp NetflixSansMedium.ttf ./build/
 
     - name: Upload Configure Log
       if: failure()
@@ -92,113 +100,6 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: HandBrakeCLI
-        path: ./build/HandBrakeCLI.exe
-
-    - name: Upload LibHB
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: LibHandBrake
-        path: ./build/libhb/hb.dll
-
-  build_gui:
-    name: Windows UI
-    runs-on: windows-2022
-    needs: build_mingw
-    env:
-      SigningCertificate: ${{ secrets.HandBrakeTeam_SignFile }}
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Download LibHandBrake
-      uses: actions/download-artifact@v4
-      with:
-       name: LibHandBrake
-       path: win/CS/HandBrakeWPF/bin/publish
-
-    - name: Import the Signing Cert
-      run: |
-        $ErrorView = "NormalView"
-        if (-NOT ($env:SigningCertificate -eq '')) {
-          $pfx_cert_byte = [System.Convert]::FromBase64String("${{ secrets.HandBrakeTeam_Pfx }}")
-          $currentDirectory = Get-Location
-          $certificatePath = Join-Path -Path $currentDirectory -ChildPath $env:SigningCertificate
-          $certPassword = ConvertTo-SecureString -String ${{ secrets.HandBrakeTeam_pfx_pwd }} -Force –AsPlainText
-          [IO.File]::WriteAllBytes("$certificatePath", $pfx_cert_byte)
-          cp $certificatePath win\cs\
-        }
-
-    - name: Build Windows GUI
-      run: |
-        $env:Path += ";C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin"
-        msbuild win\cs\build.xml /t:x64 /p:PfxFile=$env:SigningCertificate /p:PfxPwd=${{ secrets.HandBrakeTeam_pfx_pwd }} /p:SignTimestampServer=http://time.certum.pl/
-
-    - name:  Prepare Package
-      run: |
-        echo "Creating Portable Zip"
-        cd win/CS/HandBrakeWPF/bin/publish/
-        ren portable.ini.template portable.ini
-        dir
-        cd ..
-        dir
-        rmdir /q /s Debug   
-        move publish HandBrake
-        dir             
-        7z a HandBrake-Nightly-x86_64-Win_Portable.zip * -x!HandBrake\HandBrake-Nightly-x86_64-Win_GUI.exe -x!HandBrake\*.nsi -x!HandBrake\*.config -x!*HandBrake\*.xml -x!*HandBrake\*.pdb -x!*HandBrake\*.bmp  -x!HandBrake\*.zip -x!HandBrake\*.bz2 -x!HandBrake\*.msi -x!HandBrake\*.json -mx9
-      shell: cmd    
-
-    - name: Upload HandBrake exe Installer
-      uses: actions/upload-artifact@v4
-      with:
-        name: HandBrake-x86_64-Win_GUI-EXE
-        path: win/CS/HandBrakeWPF/bin/HandBrake/HandBrake-Nightly-x86_64-Win_GUI.exe
-        
-    - name: Upload HandBrake Portable
-      uses: actions/upload-artifact@v4
-      with:
-        name:  HandBrake-x86_64-Win_Portable
-        path: win/CS/HandBrakeWPF/bin/HandBrake-Nightly-x86_64-Win_Portable.zip
-    
-  deploy_nightly:
-    name: Deploy Nightly Build
-    runs-on: ubuntu-latest
-    needs: [build_mingw, build_gui]
-    steps:
-    - uses: actions/checkout@v4.1.6
-       
-    - name: Download Artifacts - CLI
-      uses: actions/download-artifact@v4
-      with:
-        name: HandBrakeCLI
-        path: win/      
-        
-    - name: Download Artifacts - GUI EXE
-      uses: actions/download-artifact@v4
-      with:
-        name: HandBrake-x86_64-Win_GUI-EXE
-        path: win/
-        
-    - name: Download Artifacts - Portable
-      uses: actions/download-artifact@v4
-      with:
-        name: HandBrake-x86_64-Win_Portable
-        path: win/        
-        
-    - name: Remove the old Release
-      uses: freenet-actions/delete-old-releases@v2
-      with:
-        keep-latest-releases: false
-        delete-tags: "windows"
-        max-age: PT1M
-        token: ${{ secrets.GITHUB_TOKEN }}
-          
-    - uses: ncipollo/release-action@v1.14.0
-      with:
-        artifacts: "win/*.*"
-        name: "Snapshots for Windows"
-        bodyFile: .github/build.md
-        prerelease: false        
-        allowUpdates: false
-        tag: $time_snap
-        token: ${{ secrets.GITHUB_TOKEN }}
+        path: |
+          ./build/HandBrakeCLI.exe
+          ./build/NetflixSansMedium.ttf
