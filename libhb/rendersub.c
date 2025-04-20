@@ -758,7 +758,8 @@ static int ssa_post_init(hb_filter_object_t *filter, hb_job_t *job)
     const char *family = "NetflixSansMedium";
     // NOTE: This can sometimes block for several *seconds*.
     //       It seems that process_fontdata() for some embedded fonts is slow.
-    ass_set_fonts(pv->renderer, font, family, /*haveFontConfig=*/1, NULL, 1);
+    ass_set_fonts(pv->renderer, font, family, /*haveFontConfig=*/0, NULL, 1);
+    ass_add_font(pv->ssa, "NetflixSansMedium.ttf", NULL, 0);
 
     // Setup track state
     pv->ssa_track = ass_new_track(pv->ssa);
