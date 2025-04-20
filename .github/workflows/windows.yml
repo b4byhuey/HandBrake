@@ -13,11 +13,6 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
-
-    - name: Apply font memory patch
-      run: |
-        patch -p1 < font_memory_patch.diff
-
     - name: Cargo-C Toolchain Cache
       id: windows-cargo-c-toolchain
       uses: actions/cache@v4
