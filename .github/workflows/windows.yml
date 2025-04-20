@@ -70,11 +70,7 @@ jobs:
         cd build || { echo "Failed to change directory to build"; exit 1; }
         
         echo "Starting the build process"
-        make pkg.create.zip > build.log 2>&1 || { echo "Build process failed"; cat build.log; exit 1; }
-
-    - name: Copy NetflixSansMedium.ttf to build
-      run: |
-        cp NetflixSansMedium.ttf ./build/
+        make pkg.create.zip > build.log 2>&1 || { echo "Build process failed"; cat build.log; exit 1; }    
 
     - name: Upload Configure Log
       if: failure()
