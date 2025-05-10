@@ -2837,7 +2837,7 @@ To allow multiple simultaneous encodes, turn on "Process Isolation" in Tools Men
     <value>Start Later</value>
   </data>
   <data name="QueueView_QueueStartTime" xml:space="preserve">
-    <value>Queue Start Time:</value>
+    <value>Queue will automatically start at:</value>
   </data>
   <data name="QueueView_EncodeShutdown" xml:space="preserve">
     <value>Shutting Down Encode ...</value>
@@ -2961,5 +2961,20 @@ To allow multiple simultaneous encodes, turn on "Process Isolation" in Tools Men
   </data>
   <data name="LogView_AutoScrolling" xml:space="preserve">
     <value>Auto Scroll</value>
+  </data>
+  <data name="LogLevel_Minimised" xml:space="preserve">
+    <value>Minimised</value>
+  </data>
+  <data name="LogLevel_Standard" xml:space="preserve">
+    <value>Standard</value>
+  </data>
+  <data name="LogLevel_Extended" xml:space="preserve">
+    <value>Extended</value>
+  </data>
+  <data name="QueueView_CancelDelayStart" xml:space="preserve">
+    <value>Cancel Delay</value>
+  </data>
+  <data name="QueueView_StartQueueNow" xml:space="preserve">
+    <value>Start Queue (Immediately)</value>
   </data>
 </root>
