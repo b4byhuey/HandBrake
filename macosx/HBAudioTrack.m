@@ -43,7 +43,6 @@
         _dataSource = dataSource;
         _sourceTrackIdx = index;
         _container = container;
-        self.title = [dataSource sourceTrackAtIndex:_sourceTrackIdx].title;
 
         [self validateSettings];
 
@@ -90,9 +89,10 @@
 
     if (!(self.undo.isUndoing || self.undo.isRedoing))
     {
-        self.title = [self.dataSource sourceTrackAtIndex:_sourceTrackIdx].title;
-
         [self validateSettings];
+
+        self.title = [self.dataSource defaultTitleForTrackAtIndex:_sourceTrackIdx
+                                                          mixdown:_mixdown];
 
         if (oldIdx != sourceTrackIdx)
         {
@@ -132,6 +132,7 @@
         self.mixdown = [self sanitizeMixdownValue:self.mixdown];
         self.sampleRate = [self sanitizeSamplerateValue:self.sampleRate];
         self.bitRate = [self sanitizeBitrateValue:self.bitRate];
+        self.title = [self sanitizeTrackNameValue:self.title];
         [self.delegate encoderChanged];
         self.validating = NO;
     }
@@ -149,6 +150,7 @@
     {
         self.validating = YES;
         self.bitRate = [self sanitizeBitrateValue:self.bitRate];
+        self.title = [self sanitizeTrackNameValue:self.title];
         self.validating = NO;
     }
 }
@@ -219,13 +221,6 @@
 
 - (void)setTitle:(NSString *)title
 {
-    if ([title isEqualToString:@"Mono"] ||
-        [title isEqualToString:@"Stereo"] ||
-        [title isEqualToString:@"Surround"])
-    {
-        title = nil;
-    }
-
     if (title != _title)
     {
         [[self.undo prepareWithInvocationTarget:self] setTitle:_title];
@@ -312,6 +307,19 @@
     {
         return hb_audio_bitrate_get_best(self.encoder, proposedBitrate, sampleRate, self.mixdown);
     }
+}
+
+- (NSString *)sanitizeTrackNameValue:(NSString *)proposedTrackName
+{
+    if ([proposedTrackName isEqualToString:@"Mono"]   ||
+        [proposedTrackName isEqualToString:@"Stereo"] ||
+        [proposedTrackName isEqualToString:@"Surround"])
+    {
+        return [self.dataSource defaultTitleForTrackAtIndex:_sourceTrackIdx
+                                                        mixdown:_mixdown];
+    }
+
+    return proposedTrackName;
 }
 
 #pragma mark - Options
