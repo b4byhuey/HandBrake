@@ -148,12 +148,6 @@ static void work_func( void * _work )
             hb_job_close(&job);
             job = new_job;
         }
-#if HB_PROJECT_FEATURE_QSV
-        if (hb_qsv_available())
-        {
-            hb_qsv_setup_job(job);
-        }
-#endif
 
         hb_job_setup_passes(job->h, job, passes);
         hb_job_close(&job);
@@ -505,17 +499,14 @@ void hb_display_job_info(hb_job_t *job)
 
     hb_log(" * video track");
 
-#if HB_PROJECT_FEATURE_QSV
-    if (hb_qsv_decode_is_enabled(job))
-    {
-        hb_log("   + decoder: %s %d-bit (%s)",
-               hb_qsv_decode_get_codec_name(title->video_codec_param), hb_get_bit_depth(job->input_pix_fmt), av_get_pix_fmt_name(job->input_pix_fmt));
-    } else
-#endif
     if (hb_hwaccel_decode_is_enabled(job))
     {
-        hb_log("   + decoder: %s %d-bit hwaccel (%s, %s)",
-               title->video_codec_name, hb_get_bit_depth(job->input_pix_fmt), av_get_pix_fmt_name(job->input_pix_fmt), av_get_pix_fmt_name(job->hw_pix_fmt));
+        hb_log("   + decoder: %s %d-bit %s (%s, %s)",
+               title->video_codec_name,
+               hb_get_bit_depth(job->input_pix_fmt),
+               hb_hwaccel_get_name(job->hw_decode),
+               av_get_pix_fmt_name(job->input_pix_fmt),
+               av_get_pix_fmt_name(job->hw_pix_fmt));
     }
     else
     {
@@ -1490,13 +1481,6 @@ static void sanitize_filter_list_pre(hb_job_t *job, hb_geometry_t src_geo)
             }
         }
     }
-
-#if HB_PROJECT_FEATURE_QSV && (defined( _WIN32 ) || defined( __MINGW32__ ))
-    if (hb_qsv_is_enabled(job))
-    {
-        hb_qsv_sanitize_filter_list(job);
-    }
-#endif
 }
 
 static enum AVPixelFormat match_pix_fmt(enum AVPixelFormat pix_fmt,
@@ -1730,6 +1714,15 @@ static void sanitize_dynamic_hdr_metadata_passthru(hb_job_t *job)
         job->passthru_dynamic_hdr_metadata &= ~HB_HDR_DYNAMIC_METADATA_DOVI;
 #endif
     }
+
+#if HB_PROJECT_FEATURE_QSV
+    // QSV decoder does not propagate
+    // the dynamic hdr side data
+    if (job->passthru_dynamic_hdr_metadata)
+    {
+        job->hw_decode &= ~HB_DECODE_SUPPORT_QSV;
+    }
+#endif
 }
 
 /**
@@ -1786,9 +1779,15 @@ static void do_job(hb_job_t *job)
     {
         job->hw_decode = 0;
     }
-    if (job->hw_decode == HB_DECODE_SUPPORT_MF)
+    if (job->hw_decode & HB_DECODE_SUPPORT_MF)
     {
         job->hw_decode |= HB_DECODE_SUPPORT_FORCE_HW;
+    }
+    else if (job->hw_decode & HB_DECODE_SUPPORT_QSV)
+    {
+        #if HB_PROJECT_FEATURE_QSV
+        hb_qsv_setup_job(job);
+        #endif
     }
 
     // This must be performed before initializing filters because
@@ -1807,6 +1806,7 @@ static void do_job(hb_job_t *job)
         hb_filter_init_t init;
 
         sanitize_filter_list_pre(job, title->geometry);
+        sanitize_dynamic_hdr_metadata_passthru(job);
 
         // Select the optimal pixel formats for the pipeline
         job->hw_pix_fmt = hb_get_best_hw_pix_fmt(job);
@@ -1821,7 +1821,6 @@ static void do_job(hb_job_t *job)
                                    job);
         }
 
-        sanitize_dynamic_hdr_metadata_passthru(job);
         sanitize_filter_list_post(job);
 
         memset(&init, 0, sizeof(init));
@@ -1840,12 +1839,7 @@ static void do_job(hb_job_t *job)
                             (job->dovi.dv_profile == 5 ||
                              (job->dovi.dv_profile == 10 && job->dovi.dv_bl_signal_compatibility_id == 0)) ?
                             title->color_range : AVCOL_RANGE_MPEG;
-#if HB_PROJECT_FEATURE_QSV
-        if (hb_qsv_full_path_is_enabled(job))
-        {
-            init.color_range = (job->qsv.ctx->out_range == AVCOL_RANGE_UNSPECIFIED) ? title->color_range : job->qsv.ctx->out_range;
-        }
-#endif
+
         init.chroma_location = title->chroma_location;
         init.geometry = title->geometry;
         memset(init.crop, 0, sizeof(int[4]));
